@@ -25,3 +25,22 @@ Insert them in your data structure as follows:
                                 └── part_2
 ```
 
+## Virtual Environment
+
+Install pyenv and pyenv-virtualenv:
+Install python 3.11.4:
+
+```shell
+    pyenv install 3.11.4
+```
+
+Move to repo_folder_path and:
+
+```shell
+    pyenv local 3.11.4
+    pyenv virtualenv 3.11.4 env-FSOD_CenterNet
+    pyenv activate env-FSOD_CenterNet
+    python3.11 -m pip install --upgrade pip
+    pip install -r requirements.txt
+```
+
