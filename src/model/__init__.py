@@ -19,8 +19,6 @@ class Model(Module):
         self.neck = Neck(encoded_channels)
 
     def forward(self, x):
-        print("before first encoder", x.shape)
-        x = self.encoder(x)["encoder"]
-        print("after first encoder", x.shape)
+        x = self.encoder(x)["encoder"] # needed because the encoder comes from "create_feature_extractor"
         x = self.neck(x)
         return x
