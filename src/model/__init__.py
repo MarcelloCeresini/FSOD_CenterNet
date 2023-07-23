@@ -1,5 +1,26 @@
-# from .submodule import class/function
+from torch.nn import Module, Conv2d
 
-class Backbone:
+from .encoder import Encoder
+from .neck import Neck
+
+class Model(Module):
+
     def __init__(self, name) -> None:
-        pass
+        super().__init__()
+
+        self.encoder = Encoder(name)
+
+        # get the number of channels of the last conv_layer of the encoder
+        encoded_channels = list(filter(
+            lambda x: type(x)==Conv2d, 
+            list(self.encoder.modules()))
+        )[-1].out_channels
+
+        self.neck = Neck(encoded_channels)
+
+    def forward(self, x):
+        print("before first encoder", x.shape)
+        x = self.encoder(x)["encoder"]
+        print("after first encoder", x.shape)
+        x = self.neck(x)
+        return x
