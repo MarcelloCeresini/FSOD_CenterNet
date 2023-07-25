@@ -7,11 +7,16 @@ class Encoder(Module):
     def __init__(self, name: str) -> None:
         super().__init__()
         if name == "resnet18":
-            model = resnet18(weights='IMAGENET1K_V1', progress = True)
+
+            model = resnet18(weights='IMAGENET1K_V1', 
+                             progress = True)
+            
             return_nodes = { "layer4.1.relu_1": "encoder" } # last layer before the classification head
-            self.encoder = create_feature_extractor(model, return_nodes=return_nodes)
+
+            self.encoder = create_feature_extractor(model, 
+                                                    return_nodes=return_nodes)
         else:
-            raise NotImplementedError("{} is not an implemented backbone yet".format(name))
+            raise NotImplementedError("'{}' is not an implemented backbone yet".format(name))
         
     def forward(self, x):
         x = self.encoder(x)

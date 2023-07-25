@@ -7,28 +7,35 @@ from .head_heatmap import HeadHeatmap
 
 class Model(Module):
 
-    def __init__(self, name, n_base_classes, n_novel_classes) -> None:
+    def __init__(self, 
+                 encoder_name, 
+                 n_base_classes, 
+                 n_novel_classes,
+                 head_base_heatmap_mode,
+                 head_novel_heatmap_mode) -> None:
         super().__init__()
 
-        self.encoder = Encoder(name)
+        self.encoder = Encoder(encoder_name)
 
         # get the number of channels of the last conv_layer of the encoder
-        encoded_channels = list(filter(
+        self.encoded_channels = list(filter(
             lambda x: type(x)==Conv2d, 
             list(self.encoder.modules()))
         )[-1].out_channels
 
-        self.neck = Neck(encoded_channels)
+        self.neck = Neck(self.encoded_channels)
 
-        head_input_channels = self.neck.out_channels
+        self.head_input_channels = self.neck.out_channels # input channels / 4
 
-        self.head_regressor = HeadRegressor(head_input_channels) # 2**3 because of the upsampling in the neck (halve the channels three times)
+        self.head_regressor = HeadRegressor(self.head_input_channels) # 2**3 because of the upsampling in the neck (halve the channels three times)
 
-        self.head_base_heatmap = HeadHeatmap(head_input_channels,
-                                             n_base_classes)
+        self.head_base_heatmap = HeadHeatmap(self.head_input_channels,
+                                             n_base_classes,
+                                             head_base_heatmap_mode)
         
-        self.head_novel_heatmap = HeadHeatmap(head_input_channels,
-                                              n_novel_classes)
+        self.head_novel_heatmap = HeadHeatmap(self.head_input_channels,
+                                              n_novel_classes,
+                                              head_novel_heatmap_mode)
         
     def forward(self, x):
         x = self.encoder(x)["encoder"] # needed because the encoder comes from "create_feature_extractor"

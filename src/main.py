@@ -1,8 +1,5 @@
 # import from third parties
 import torch
-from torchvision.models.resnet import resnet18
-from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
-from torch.nn import Conv2d
 
 # import from builtin (os, path, etc)
 
