@@ -39,6 +39,8 @@ class Neck(Module):
         self.upsample2 = Upsample(int(in_channels/2))
         self.upsample3 = Upsample(int(in_channels/4))
 
+        self.out_channels = self.upsample3.out_channels
+
     def forward(self, x):
         x = self.upsample1(x)
         x = self.upsample2(x)

@@ -4,6 +4,8 @@ from torch import nn
 
 # TODO: SIMPLIFY --> REMOVE THE MODULATOR CONVOLUTION (not present in original paper)
 
+# Credit: https://github.com/developer0hye/PyTorch-Deformable-Convolution-v2/blob/main/experiment.ipynb
+
 class DeformableConv2d(nn.Module):
     def __init__(self,
                  in_channels,
