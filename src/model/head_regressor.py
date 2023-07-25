@@ -14,7 +14,8 @@ class HeadRegressor(Module):
 
         self.conv1 = Conv2d(in_channels, 
                             self.head_regressor_latent_dim, 
-                            kernel_size=3)
+                            kernel_size=3,
+                            padding=1)
         
         self.activation = ReLU()
 

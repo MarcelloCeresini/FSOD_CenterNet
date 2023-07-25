@@ -9,9 +9,11 @@ from model import Model
 
 debugging = True
 
-model = Model(name="resnet18", 
+model = Model(encoder_name="resnet18", 
               n_base_classes=100,
-              n_novel_classes=10)
+              n_novel_classes=10,
+              head_base_heatmap_mode="CosHead",
+              head_novel_heatmap_mode="AdaptiveCosHead")
 
 if debugging:
     out = model(torch.randn(1,3,512,512))

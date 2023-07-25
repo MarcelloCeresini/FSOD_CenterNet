@@ -15,11 +15,12 @@ class HeadHeatmap(Module):
 
         self.conv1 = Conv2d(in_channels, 
                             in_channels, 
-                            kernel_size=3)
+                            kernel_size=3,
+                            padding=1)
         
         self.activation1 = ReLU()
 
-        if mode is None:
+        if mode == "convolution":
 
             self.second_block = Conv2d(in_channels, 
                                 n_classes, 
@@ -27,7 +28,7 @@ class HeadHeatmap(Module):
             
         elif mode == "CosHead":
 
-            self.second_block = CosHead(n_classes)
+            self.second_block = CosHead(n_classes, mode="cos")
 
         elif mode == "AdaptiveCosHead":
 
