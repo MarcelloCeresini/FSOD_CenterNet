@@ -1,7 +1,8 @@
 import torch
 from torch.utils.data import Dataset
+from torchvision.io import read_image
 
-import json, os, io
+import json, os
 
 class DatasetFromCocoAnnotations(Dataset):
 
@@ -26,13 +27,10 @@ class DatasetFromCocoAnnotations(Dataset):
 
         current_image_id = self.annotation_file["images"][idx]["id"]
 
-        original_size = (self.annotation_file["images"][idx]["width"],
-                         self.annotation_file["images"][idx]["height"])
-
         img_name = os.path.join(self.images_dir,
                                 self.annotation_file["images"][idx]["file_name"])
         
-        image = io.imread(img_name)
+        image = read_image(img_name)
 
         annotation_for_image = []
         for a in self.annotation_file["annotations"]:
@@ -52,8 +50,7 @@ class DatasetFromCocoAnnotations(Dataset):
 
 
         sample = {'image': image, 
-                  'info': {"original_image_size": original_size,
-                           "annotations": annotation_for_image}}
+                  "landmarks": annotation_for_image}
 
         if self.transform:
             sample = self.transform(sample)
