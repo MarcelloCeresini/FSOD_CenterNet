@@ -1,13 +1,15 @@
 # import from third parties
 import torch
 
-# import from builtin (os, path, etc)
 
+# import from builtin (os, path, etc)
+import sys
 
 # import from own packages
 from model import Model
 
 debugging = True
+
 
 model = Model(encoder_name="resnet18", 
               n_base_classes=100,
