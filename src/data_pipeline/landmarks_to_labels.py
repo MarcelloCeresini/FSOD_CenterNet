@@ -3,18 +3,18 @@ import numpy as np
 
 from dataset_config import DatasetConfig
 
-class LandmarksToLabels:
+class LandmarksToHeatmaps:
     def __init__(self,
                  conf: DatasetConfig) -> None:
         
         # model outputs (out_reg, out_heat_base, out_heat_novel)
         self.output_resolution = conf.output_resolution
         self.regressor_label_size = [4, *self.output_resolution]
-        self.heatmap_base_size = [conf.n_base_classes, *self.output_resolution]
-        self.heatmap_novel_size = [conf.n_novel_classes, *self.output_resolution]
 
         self.output_stride = conf.output_stride
         self.min_IoU_for_gaussian_radius = conf.min_IoU_for_gaussian_radius
+        self.n_base_classes = conf.n_base_classes
+        self.n_novel_classes = conf.n_novel_classes
 
     def gaussian_radius(self, det_size, min_overlap):
         '''
@@ -68,11 +68,6 @@ class LandmarksToLabels:
         
         space_left, space_right = min(cx, radius), min(width - cx, radius + 1)
         space_top, space_bottom = min(cy, radius), min(height -cy, radius + 1)
-
-        # masked_heatmap  = heatmap[cx - space_left: cx + space_right,
-        #                           cy - space_top: cy + space_bottom]
-        # masked_gaussian = gaussian[radius - space_left: radius + space_right,
-        #                            radius - space_top: radius + space_bottom]
         
         masked_heatmap  = heatmap[cy - space_top: cy + space_bottom,
                                   cx - space_left: cx + space_right]
@@ -85,11 +80,44 @@ class LandmarksToLabels:
 
 
     def __call__(self, 
-                 landmarks) -> tuple():
+                 sample) -> tuple():
         
-        regressor_label = T.zeros(self.regressor_label_size)
-        heatmap_base = T.zeros(self.heatmap_base_size)
-        heatmap_novel = T.zeros(self.heatmap_novel_size)
+        image, landmarks = sample["image"], sample["landmarks"]
+
+        img_size = image.shape[1:3]
+        
+        heatmap_base = T.zeros([self.n_base_classes, *img_size])
+        heatmap_novel = T.zeros([self.n_novel_classes, *img_size])
+
+        for l in landmarks:
+            cp_idx = [int(np.floor(l["center_point"][0])),
+                      int(np.floor(l["center_point"][1]))]
+
+            if (cat := l["category_id"]) < (n_bc := self.n_base_classes):
+                heatmap_base[cat, ...] = self.draw_gaussian(heatmap_base[cat, ...],
+                                                            [*cp_idx, *l["size"]])
+            else:
+                heatmap_novel[cat, ...] = self.draw_gaussian(heatmap_novel[cat-n_bc, ...],
+                                                             [*cp_idx, *l["size"]])
+        return image, landmarks, heatmap_base, heatmap_novel
+    
+
+class GetRegressorLabels:
+    '''
+    Create the offset and size labels for the regressor head ONLY AFTER the image has been cropped and resized.
+    '''
+    def __init__(self,
+                 conf: DatasetConfig) -> None:
+        
+        self.output_resolution = conf.output_resolution
+        self.regressor_label_size = [4, *self.output_resolution]
+        self.output_stride = conf.output_stride
+        
+    def __call__(self,
+                 landmarks):
+        
+        # TODO: it could be a sparse tensor
+        regressor_label = T.zeros(self.regressor_label_size) # already in low res
 
         for l in landmarks:
             low_res_cp = [l["center_point"][0] / self.output_stride[0],
@@ -101,18 +129,15 @@ class LandmarksToLabels:
             lr_cp_idx = [int(np.floor(low_res_cp[0])),
                          int(np.floor(low_res_cp[1]))]
             
-            offset = [int(low_res_cp[0] - lr_cp_idx[0]),
-                      int(low_res_cp[1] - lr_cp_idx[1])]
+            if (0 <= lr_cp_idx[0] <= self.output_resolution[0]) and \
+               (0 <= lr_cp_idx[1] <= self.output_resolution[1]):
+            
+                offset = [low_res_cp[0] - lr_cp_idx[0],
+                          low_res_cp[1] - lr_cp_idx[1]]
 
-            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
-            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
-            regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = size_small[0]
-            regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = size_small[1]
+                regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
+                regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
+                regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = size_small[0]
+                regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = size_small[1]
 
-            if (cat := l["category_id"]) < (n_bc := self.heatmap_base_size[0]):
-                heatmap_base[cat, ...] = self.draw_gaussian(heatmap_base[cat, ...],
-                                                            [*lr_cp_idx, *size_small])
-            else:
-                heatmap_novel[cat, ...] = self.draw_gaussian(heatmap_novel[cat-n_bc, ...],
-                                                             [*lr_cp_idx, *size_small])
-        return regressor_label, heatmap_base, heatmap_novel
+        return regressor_label

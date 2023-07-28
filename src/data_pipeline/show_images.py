@@ -65,7 +65,7 @@ def rewrite_bbox(img_size, annotation):
 
 ### SHOW HEATMAPS
 grid = [F.pil_to_tensor(blend(F.to_pil_image(i["image"]), 
-                              F.to_pil_image(i["labels"]), 
+                              F.to_pil_image(i["heatmap"]), 
                               alpha=0.4))
         for i in dataset]
 show(grid)

@@ -7,57 +7,60 @@ class RandomResizedCropOwn():
     def __init__(self, 
                  size, 
                  scale, 
-                 ratio) -> None:
+                 ratio,
+                 can_cut_objects: bool = True) -> None:
         
         self.size = size
         self.scale = scale
         self.ratio = ratio
+        self.can_cut_objects = can_cut_objects
 
-        self.random_resize_crop = RandomResizedCrop(size=self.size,
-                                                    scale=self.scale,
-                                                    ratio=self.ratio)
+        if self.can_cut_objects:
+            self.random_resize_crop = RandomResizedCrop(size=self.size,
+                                                        scale=self.scale,
+                                                        ratio=self.ratio)
 
     def __call__(self, sample):
 
-        image, landmarks = sample["image"], sample["landmarks"]
+        images, landmarks = sample[:3], sample[3]
 
-        top, left, h, w = self.random_resize_crop.get_params(image, 
-                                                        self.scale, 
-                                                        self.ratio)
+        if self.can_cut_objects:
+            top, left, h, w = self.random_resize_crop.get_params(images[0],
+                                                                 self.scale,
+                                                                 self.ratio)
+        else:
+            raise NotImplementedError("'Can cut objects' not implemented yet") # TODO: implement (find: top, left, h, w)
+
+        out_images = [F.resized_crop(i,
+                                     top, left, h, w, 
+                                     self.size,
+                                     antialias=True) 
+                      for i in images]
+    
         
-        image = F.resized_crop(image,
-                               top, left, h, w, 
-                               self.size,
-                               antialias=True)
-        
-        accepted = []
+        out_landmarks = []
 
         # annotations are [cpX, cpY, sizeX, sizeY] but instead crop wants [top, left, h, w]
         for l in landmarks:
             new_cp = (l["center_point"][0] - left,
                       l["center_point"][1] - top)
                         
-            # TODO: is it ok if we accept bboxes ONLY IF THEIR CENTER IS IN THE CROP? 
-            # TODO: do we need some stats to understand how many we reject?
-            if (0 <= new_cp[0] <= w) and (0 <= new_cp[1] <= h):
-
-                accepted.append({
-                    "center_point": new_cp,
-                    "size":         l["size"],
-                    "category_id":  l["category_id"]
-                })
+            out_landmarks.append({
+                "center_point": new_cp,
+                "size":         l["size"],
+                "category_id":  l["category_id"]
+            })
         
-
         # resize
-        for l in accepted:
+        for l in out_landmarks:
             l["center_point"] = (l["center_point"][0] * self.size[0] / w,
                                  l["center_point"][1] * self.size[1] / h)
             
             l["size"] = (l["size"][0] * self.size[0] / w,
                          l["size"][1] * self.size[1] / h)
-            
-        return {"image": image, 
-                "landmarks": accepted}
+        
+        
+        return out_images, out_landmarks
 
 
 class RandomVerticalFlipOwn():
@@ -66,19 +69,12 @@ class RandomVerticalFlipOwn():
         self.p = p
 
     def __call__(self, 
-                 sample):
-        image, landmarks = sample["image"], sample["landmarks"]
-        _, h = F.get_image_size(image)
-
-        if T.bernoulli(T.tensor([self.p])):
-            image = F.vflip(image)
-
-            for l in landmarks:
-                l["center_point"] = (l["center_point"][0],
-                                     h - l["center_point"][1])
+                 input):
         
-        return {"image": image, 
-                "landmarks": landmarks}
+        if T.bernoulli(T.tensor([self.p])):
+            return [F.vflip(i) for i in input]
+        else:
+            return input
 
 
 class RandomHorizontalFlipOwn():
@@ -86,21 +82,13 @@ class RandomHorizontalFlipOwn():
                  p: float = 0.5) -> None:
         self.p = p
 
-    def __call__(self, sample):
-        image, landmarks = sample["image"], sample["landmarks"]
+    def __call__(self, 
+                 input):
         
-        w, _ = F.get_image_size(image)
-
         if T.bernoulli(T.tensor([self.p])):
-
-            image = F.hflip(image)
-
-            for l in landmarks:
-                l["center_point"] = (w - l["center_point"][0],
-                                     l["center_point"][1])
-        
-        return {"image": image, 
-                "landmarks": landmarks}
+            return [F.hflip(i) for i in input]
+        else:
+            return input
 
 
 class NormalizeOwn():
@@ -117,7 +105,8 @@ class ResizeAndNormalizeLabelsOwn():
         self.out_size = size
         self.resize = Resize(size=self.out_size)
 
-    def __call__(self, labels) -> tuple:
+    def __call__(self, 
+                 labels) -> T.tensor:
         _, heatmap_base, heatmap_novel = labels
 
         heatmap_base = self.resize(heatmap_base)
