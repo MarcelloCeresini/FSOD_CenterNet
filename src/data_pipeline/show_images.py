@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
 from torchvision.utils import draw_bounding_boxes
-from torchvision.ops import box_convert
-import torch
+import torch as T
+from PIL.Image import blend
 
 from dataset_from_coco_annotations import DatasetFromCocoAnnotations
 from transform import TransformAndAugment
@@ -11,14 +11,14 @@ from dataset_config import DatasetConfig
 
 dataset = DatasetFromCocoAnnotations(annotations_path="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/annotations/fsod_train_short.json",
                                      images_dir="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/images",
-                                     transform=TransformAndAugment(DatasetConfig()))
+                                     transform=TransformAndAugment(DatasetConfig(), 
+                                                                   to_be_shown=True))
 
 img_list = []
 annotation_list = []
 
 for i in dataset:
     img_list.append(i["image"])
-    print(torch.max(i["image"]))
     annotation_list.append(i["landmarks"])
 
 plt.rcParams["savefig.bbox"] = 'tight'
@@ -51,15 +51,23 @@ def rewrite_bbox(img_size, annotation):
         assert 0 <= xyxy_bbox[1] < xyxy_bbox[3] <= img_size[1], f"bbox: {xyxy_bbox}, img_size: {img_size}, cp: {cp}, size: {size}"
     
     if len(list_of_bboxes) == 0:
-        return torch.tensor([])
+        return T.tensor([])
     
-    out = torch.tensor(list_of_bboxes)
+    out = T.tensor(list_of_bboxes)
 
     return out
 
-grid = [draw_bounding_boxes(i["image"], 
-                            rewrite_bbox(F.get_image_size(i["image"]), i["landmarks"]),
-                            width=4) for i in dataset]
+### SHOW BOUDING BOXES
+# grid = [draw_bounding_boxes(i["image"], 
+#                             rewrite_bbox(F.get_image_size(i["image"]), i["landmarks"]),
+#                             width=4) for i in dataset]
+# show(grid)
 
+### SHOW HEATMAPS
+grid = [F.pil_to_tensor(blend(F.to_pil_image(i["image"]), 
+                              F.to_pil_image(i["labels"]), 
+                              alpha=0.4))
+        for i in dataset]
 show(grid)
+
 plt.show()

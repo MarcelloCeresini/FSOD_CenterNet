@@ -4,12 +4,14 @@ from torchvision.io import read_image
 
 import json, os
 
+from transform import TransformAndAugment
+
 class DatasetFromCocoAnnotations(Dataset):
 
     def __init__(self, 
                  annotations_path: str, 
                  images_dir: str, 
-                 transform=None) -> None:
+                 transform : TransformAndAugment = None) -> None:
         super().__init__()
 
         with open(annotations_path, "r") as f:
@@ -22,6 +24,7 @@ class DatasetFromCocoAnnotations(Dataset):
         return len(self.annotation_file["images"])
 
     def __getitem__(self, idx):
+
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
