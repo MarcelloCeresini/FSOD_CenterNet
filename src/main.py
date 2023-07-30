@@ -7,6 +7,7 @@ import sys
 
 # import from own packages
 from model import Model
+from data_pipeline import DatasetFromCocoAnnotations, TransformAndAugment
 
 debugging = True
 
@@ -35,3 +36,9 @@ for module in model.named_children():
         module[1].requires_grad_(False)
 
 # training on novel_dataset: loss on novel head is the one you used for base
+
+# evaluation on base_dataset
+
+# evaluation on novel_dataset
+
+# aggregation and print results

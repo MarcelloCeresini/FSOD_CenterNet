@@ -95,24 +95,21 @@ class LandmarksToLabels:
             low_res_cp = [l["center_point"][0] / self.output_stride[0],
                           l["center_point"][1] / self.output_stride[1]]
             
-            size_small = [l["size"][0] / self.output_stride[0],
-                          l["size"][1] / self.output_stride[1]]
-            
             lr_cp_idx = [int(np.floor(low_res_cp[0])),
                          int(np.floor(low_res_cp[1]))]
             
             offset = [int(low_res_cp[0] - lr_cp_idx[0]),
                       int(low_res_cp[1] - lr_cp_idx[1])]
 
-            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
-            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
-            regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = size_small[0]
-            regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = size_small[1]
+            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0]
+            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1]
+            regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
+            regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
             if (cat := l["category_id"]) < (n_bc := self.heatmap_base_size[0]):
                 heatmap_base[cat, ...] = self.draw_gaussian(heatmap_base[cat, ...],
-                                                            [*lr_cp_idx, *size_small])
+                                                            [*lr_cp_idx, *l["size"]])
             else:
                 heatmap_novel[cat, ...] = self.draw_gaussian(heatmap_novel[cat-n_bc, ...],
-                                                             [*lr_cp_idx, *size_small])
+                                                             [*lr_cp_idx, *l["size"]])
         return regressor_label, heatmap_base, heatmap_novel

@@ -38,6 +38,16 @@ class Model(Module):
                                               head_novel_heatmap_mode)
         
     def forward(self, x):
+        '''
+        Returns a tuple of three tensors:
+        - out_reg: (batch_size, 4, init_size_x/4, init_size_y/4):
+            - size_x
+            - size_y
+            - offset_x
+            - offset_y
+        - out_heat_base: (batch_size, n_base_classes, init_size_x/4, init_size_y/4)
+        - out_heat_novel: (batch_size, n_novel_classes, init_size_x/4, init_size_y/4)
+        '''
         x = self.encoder(x)["encoder"] # needed because the encoder comes from "create_feature_extractor"
         x = self.neck(x)
 
