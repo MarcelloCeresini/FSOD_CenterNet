@@ -60,6 +60,32 @@ class RandomResizedCropOwn():
                 "landmarks": accepted}
 
 
+class ResizeOwn():
+    def __init__(self, 
+                 size) -> None:
+        
+        self.size = size
+
+        self.resize = Resize(size=self.size)
+
+    def __call__(self, sample):
+
+        image, landmarks = sample["image"], sample["landmarks"]
+
+        w, h = F.get_image_size(image)
+
+        # resize
+        for l in landmarks:
+            l["center_point"] = (l["center_point"][0] * self.size[0] / w,
+                                 l["center_point"][1] * self.size[1] / h)
+            
+            l["size"] = (l["size"][0] * self.size[0] / w,
+                         l["size"][1] * self.size[1] / h)
+            
+        return {"image": image, 
+                "landmarks": landmarks}
+
+
 class RandomVerticalFlipOwn():
     def __init__(self,
                  p: float = 0.5) -> None:

@@ -6,13 +6,12 @@ import torch as T
 from PIL.Image import blend
 
 from . import DatasetFromCocoAnnotations
-from transform import TransformAndAugment
+from transform import TransformTraining
 from dataset_config import DatasetConfig
 
 dataset = DatasetFromCocoAnnotations(annotations_path="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/annotations/fsod_train_short.json",
                                      images_dir="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/images",
-                                     transform=TransformAndAugment(DatasetConfig(), 
-                                                                   to_be_shown=True))
+                                     transform=TransformTraining())
 
 img_list = []
 annotation_list = []

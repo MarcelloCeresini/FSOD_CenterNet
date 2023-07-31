@@ -1,9 +1,10 @@
 import torch as T
-import torch.nn.functional as F
+import torch.nn.functional as NNF
+import torchvision.transforms.functional as TF
 import numpy as np
+from torchmetrics.detection import MeanAveragePrecision
 
-from .eval_config import EvalConfig
-from data_pipeline import TransformAndAugment
+from data_pipeline.transform import anti_transform_testing_after_model
 
 class Evaluate:
     '''
@@ -12,19 +13,17 @@ class Evaluate:
 
     def __init__(self,
                  model, 
-                 dataset,
-                 conf: EvalConfig = EvalConfig()):
+                 dataset):
         
         self.model = model
         self.dataset = dataset
-        self.conf = conf
         self.stride = self.dataset.transform.conf.output_stride
 
-        self.dataset.set_transform(TransformAndAugment(testing=True))
+        self.metric = MeanAveragePrecision(box_format="cxcywh")
 
-        self.IoU_threshold_sets = conf.IoU_threshold_sets
+        # self.IoU_threshold_sets = conf.IoU_threshold_sets
 
-        self.confusion_matrices = {key: [np.zeros(2,2) for _ in self.IoU_threshold_sets[key]] for key in self.IoU_threshold_sets}
+        # self.confusion_matrices = {key: [np.zeros(2,2) for _ in self.IoU_threshold_sets[key]] for key in self.IoU_threshold_sets}
 
     def get_heatmap_maxima_idxs(self, 
                                 complete_heatmaps):
@@ -63,7 +62,7 @@ class Evaluate:
 
     def __call__(self):
 
-        for image, landmarks in self.dataset:
+        for image, landmarks, original_sample in self.dataset:
             # both image and landmarks will be resized to model_input_size
             pred = self.model(image)
 
@@ -75,13 +74,29 @@ class Evaluate:
             landmarks_pred = self.landmarks_from_idxs(pred[0],
                                                       complete_heatmaps,
                                                       idxs_tensor)
+            
+            landmarks_pred_resized_to_original = anti_transform_testing_after_model(image,
+                                                                                    landmarks_pred,
+                                                                                    TF.get_image_size(original_sample["image"]))
 
-            for th_set in self.IoU_threshold_sets:
-                for th in th_set:
-                    for l_gt, l_pred in zip(landmarks, landmarks_pred):
-                        pass
+            pred_to_metric = []
+            for l in landmarks_pred_resized_to_original:
+                pred_to_metric.append({
+                    "boxes": l["center_point"] + l["size"],
+                    "labels": l["category_id"],
+                    "scores": l["confidence_score"]
+                })
 
+            gt_to_metric = []
+            for l in original_sample["landmarks"]:
+                gt_to_metric.append({
+                    "boxes": l["center_point"] + l["size"],
+                    "labels": l["category_id"]
+                })
+
+            self.metric.update(preds=pred_to_metric, 
+                               target=gt_to_metric)
+            
+        return self.metric.compute()
         
-        # Calculate the precision at every recall value(0 to 1 with a step size of 0.01), 
-        # then it is repeated for IoU thresholds of 0.55,0.60,…,.95.
 

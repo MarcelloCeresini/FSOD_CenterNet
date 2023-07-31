@@ -1,20 +1,18 @@
-from .dataset_from_coco_annotations import DatasetFromCocoAnnotations
-from .transform import TransformAndAugment
-
 import torch
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
 import json, os
 
-from transform import TransformAndAugment
+from .transform import TransformTraining, TransformTesting
 
 class DatasetFromCocoAnnotations(Dataset):
 
     def __init__(self, 
                  annotations_path: str, 
                  images_dir: str, 
-                 transform: TransformAndAugment = None) -> None:
+                 transform = None,
+                 to_be_shown: bool = False) -> None:
         super().__init__()
 
         with open(annotations_path, "r") as f:
@@ -34,6 +32,7 @@ class DatasetFromCocoAnnotations(Dataset):
                 - category_id
                 - center_point
                 - size
+            - original_image_size
         '''
 
         if torch.is_tensor(idx):
@@ -66,7 +65,11 @@ class DatasetFromCocoAnnotations(Dataset):
         sample = {'image': image, 
                   "landmarks": annotation_for_image}
 
-        if self.transform:
-            sample = self.transform(sample)
+        if isinstance(self.transform, (TransformTraining, TransformTesting)):
+            
+            sample, transformed_landmarks, original_sample = self.transform(sample)
 
-        return sample
+            return sample, transformed_landmarks, original_sample
+
+        else:
+            return sample

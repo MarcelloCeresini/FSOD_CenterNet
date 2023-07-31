@@ -2,23 +2,13 @@ from torchvision.transforms import ColorJitter, Compose, GaussianBlur, Resize
 from torch import rand
 
 from dataset_config import DatasetConfig
-from own_transforms import RandomResizedCropOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
+from own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
 from landmarks_to_labels import LandmarksToLabels
 
-class TransformAndAugment():
+class TransformTraining:
     def __init__(self,
-                 conf: DatasetConfig = DatasetConfig(),
-                 to_be_shown: bool = False,
-                 testing: bool = False) -> None:
+                 conf: DatasetConfig = DatasetConfig()) -> None:
         
-        # TODO: implement testing option:
-        # - no cropping 
-        # - still resizing
-        # - still flips
-        # - no color transformations
-        
-        self.to_be_shown = to_be_shown
-
         self.random_crop = RandomResizedCropOwn(size=conf.input_to_model_resolution,
                                                 scale=conf.crop_scale, # scale of the crop (before resizing) compared to original image
                                                 ratio=conf.crop_ratio) # aspect ratio of the crop (before resizing) compared to original image
@@ -26,11 +16,6 @@ class TransformAndAugment():
         self.random_vertical_flip = RandomVerticalFlipOwn(p=conf.p_vertical_flip)
 
         self.random_horizontal_flip = RandomHorizontalFlipOwn(p=conf.p_horizontal_flip)
-
-        self.composed = Compose([self.random_crop,
-                                 self.random_vertical_flip,
-                                 self.random_horizontal_flip,
-                                 ])
 
         # TODO: check parameters and put them in config
         self.color_jitter = ColorJitter(brightness=0.2, 
@@ -42,96 +27,82 @@ class TransformAndAugment():
         
         self.gaussian_blur = GaussianBlur(kernel_size=7,
                                           sigma=sampled_sigma.item())
-
-        # if we only change the colors but not the geomerty, we don't need to change the annotations
-        list_of_compositions_no_landmarks = [self.color_jitter,
-                                             self.gaussian_blur,
-                                            # TODO: add salt and pepper noise?
-                                            ]
         
         self.normalize = NormalizeOwn()
 
-        list_of_compositions_only_landmarks = [LandmarksToLabels(conf)]
+        self.landmarks_to_labels = LandmarksToLabels(conf)
 
-        if self.to_be_shown:
-            list_of_compositions_only_landmarks.append(ResizeAndNormalizeLabelsOwn(conf.input_to_model_resolution))
-        else:
-            list_of_compositions_no_landmarks.append(self.normalize)
+
+    def __call__(self, 
+                 original_sample):
+        '''
+        Returns:
+            (image, labels): tuple of tensors to be given as input to the training of the model
+            landmarks: useful for visualization
+            original_sample: useful for visualization
+        '''
+        transformed_sample = Compose([self.random_crop,
+                          self.random_vertical_flip,
+                          self.random_horizontal_flip])(original_sample)
+
+        image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
+
+        image = Compose([self.color_jitter,
+                         self.gaussian_blur,
+                         self.normalize])(image)
         
-        self.composed_no_landmarks = Compose(list_of_compositions_no_landmarks)
-        self.compose_only_landmarks = Compose(list_of_compositions_only_landmarks)
+        labels = self.landmarks_to_labels(landmarks)
 
-    def set_testing(self,
-                    testing: bool) -> None:
-        self.testing = testing
-
-
-    def __call__(self, sample):
-        # TODO: implement testing option:
-        # - no cropping 
-        # - still resizing
-        # - still flips
-        # - no color transformations
-        sample = self.composed(sample)
-
-        image, landmarks = sample["image"], sample["landmarks"]
-
-        image = self.composed_no_landmarks(image)
-        labels = self.compose_only_landmarks(landmarks)
-        # labels = self.transform_landmarks_into_labels(landmarks)
-
-        if self.to_be_shown:
-            return {"image": image, 
-                    "landmarks": landmarks,
-                    "labels": labels
-                    }
-        else:
-            return (image, labels)
+        return (image, labels), landmarks, original_sample
         
 
-class TransformOnly():
+class TransformTesting:
     def __init__(self,
-                 conf: DatasetConfig,
-                 to_be_shown: bool = False) -> None:
+                 conf: DatasetConfig = DatasetConfig()) -> None:
         
-        self.to_be_shown = to_be_shown
-
-        # TODO: 
-
-        # self.random_vertical_flip = RandomVerticalFlipOwn(p=conf.p_vertical_flip)
-
-        # self.random_horizontal_flip = RandomHorizontalFlipOwn(p=conf.p_horizontal_flip)
-
-        # self.composed = Compose([self.random_crop,
-        #                          self.random_vertical_flip,
-        #                          self.random_horizontal_flip,
-        #                          ])
-
-        # self.normalize = NormalizeOwn()
-
-        list_of_compositions_only_landmarks = [LandmarksToLabels(conf)]
-
-        if self.to_be_shown:
-            list_of_compositions_only_landmarks.append(ResizeAndNormalizeLabelsOwn(conf.input_to_model_resolution))
-        # else:
-        #     list_of_compositions_no_landmarks.append(self.normalize)
+        self.resize = ResizeOwn(size=conf.input_to_model_resolution) # aspect ratio of the crop (before resizing) compared to original image
         
-        self.composed_no_landmarks = Compose(list_of_compositions_no_landmarks)
-        self.compose_only_landmarks = Compose(list_of_compositions_only_landmarks)
+        self.normalize = NormalizeOwn()
 
-    def __call__(self, sample):
-        sample = self.composed(sample)
+        self.landmarks_to_labels = LandmarksToLabels(conf)
 
-        image, landmarks = sample["image"], sample["landmarks"]
 
-        image = self.composed_no_landmarks(image)
-        labels = self.compose_only_landmarks(landmarks)
-        # labels = self.transform_landmarks_into_labels(landmarks)
+    def __call__(self, 
+                 original_sample):
+        '''
+        Returns:
+            image: tensor to be given as input to the model
+            landmarks: useful for visualization and evaluation (but they are resized)
+            original_sample: useful for visualization and evaluation (they contain the original landmarks)
+        '''
+        transformed_sample = self.resize(original_sample)
 
-        if self.to_be_shown:
-            return {"image": image, 
-                    "landmarks": landmarks,
-                    "labels": labels
-                    }
-        else:
-            return (image, labels)
+        image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
+
+        image = self.normalize(image)
+
+        return image, landmarks, original_sample
+
+
+def anti_transform_testing_after_model(current_image,
+                                       landmarks,
+                                       original_image_size):
+    '''
+    Returns the landmarks in the original image size after the output of the model
+    '''
+    
+    wi, hi = current_image.shape[1:]
+    wf, hf = original_image_size
+
+    # resize
+    for l in landmarks:
+        l["center_point"] = (l["center_point"][0] * wf / wi,
+                             l["center_point"][1] * hf / hi)
+        
+        l["size"] = (l["size"][0] * wf / wi,
+                     l["size"][1] * hf / hi)
+        
+    return current_image*255. , landmarks
+
+
+        
