@@ -1,5 +1,6 @@
-from torchvision.transforms import ColorJitter, Compose, GaussianBlur, Resize
-from torch import rand
+import torch as T
+from torchvision.transforms import ColorJitter, Compose, GaussianBlur
+
 
 from dataset_config import DatasetConfig
 from own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
@@ -23,7 +24,7 @@ class TransformTraining:
                                         saturation=0.2, 
                                         hue=0.2)
         
-        sampled_sigma = rand(1) * (conf.sgb_lims[1]-conf.sgb_lims[0]) + conf.sgb_lims[0]
+        sampled_sigma = T.rand(1) * (conf.sgb_lims[1]-conf.sgb_lims[0]) + conf.sgb_lims[0]
         
         self.gaussian_blur = GaussianBlur(kernel_size=7,
                                           sigma=sampled_sigma.item())
@@ -42,8 +43,8 @@ class TransformTraining:
             original_sample: useful for visualization
         '''
         transformed_sample = Compose([self.random_crop,
-                          self.random_vertical_flip,
-                          self.random_horizontal_flip])(original_sample)
+                                      self.random_vertical_flip,
+                                      self.random_horizontal_flip])(original_sample)
 
         image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
 
@@ -86,7 +87,7 @@ class TransformTesting:
 
 def anti_transform_testing_after_model(current_image,
                                        landmarks,
-                                       original_image_size):
+                                       original_image_size) -> tuple(T.tensor):
     '''
     Returns the landmarks in the original image size after the output of the model
     '''
