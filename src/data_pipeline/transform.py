@@ -7,8 +7,15 @@ from landmarks_to_labels import LandmarksToLabels
 
 class TransformAndAugment():
     def __init__(self,
-                 conf: DatasetConfig,
-                 to_be_shown: bool = False) -> None:
+                 conf: DatasetConfig = DatasetConfig(),
+                 to_be_shown: bool = False,
+                 testing: bool = False) -> None:
+        
+        # TODO: implement testing option:
+        # - no cropping 
+        # - still resizing
+        # - still flips
+        # - no color transformations
         
         self.to_be_shown = to_be_shown
 
@@ -50,6 +57,64 @@ class TransformAndAugment():
             list_of_compositions_only_landmarks.append(ResizeAndNormalizeLabelsOwn(conf.input_to_model_resolution))
         else:
             list_of_compositions_no_landmarks.append(self.normalize)
+        
+        self.composed_no_landmarks = Compose(list_of_compositions_no_landmarks)
+        self.compose_only_landmarks = Compose(list_of_compositions_only_landmarks)
+
+    def set_testing(self,
+                    testing: bool) -> None:
+        self.testing = testing
+
+
+    def __call__(self, sample):
+        # TODO: implement testing option:
+        # - no cropping 
+        # - still resizing
+        # - still flips
+        # - no color transformations
+        sample = self.composed(sample)
+
+        image, landmarks = sample["image"], sample["landmarks"]
+
+        image = self.composed_no_landmarks(image)
+        labels = self.compose_only_landmarks(landmarks)
+        # labels = self.transform_landmarks_into_labels(landmarks)
+
+        if self.to_be_shown:
+            return {"image": image, 
+                    "landmarks": landmarks,
+                    "labels": labels
+                    }
+        else:
+            return (image, labels)
+        
+
+class TransformOnly():
+    def __init__(self,
+                 conf: DatasetConfig,
+                 to_be_shown: bool = False) -> None:
+        
+        self.to_be_shown = to_be_shown
+
+        # TODO: 
+
+        # self.random_vertical_flip = RandomVerticalFlipOwn(p=conf.p_vertical_flip)
+
+        # self.random_horizontal_flip = RandomHorizontalFlipOwn(p=conf.p_horizontal_flip)
+
+        # self.composed = Compose([self.random_crop,
+        #                          self.random_vertical_flip,
+        #                          self.random_horizontal_flip,
+        #                          ])
+
+        # self.normalize = NormalizeOwn()
+
+        list_of_compositions_only_landmarks = [LandmarksToLabels(conf)]
+
+        if self.to_be_shown:
+            list_of_compositions_only_landmarks.append(ResizeAndNormalizeLabelsOwn(conf.input_to_model_resolution))
+        # else:
+        #     list_of_compositions_no_landmarks.append(self.normalize)
         
         self.composed_no_landmarks = Compose(list_of_compositions_no_landmarks)
         self.compose_only_landmarks = Compose(list_of_compositions_only_landmarks)

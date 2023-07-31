@@ -5,7 +5,7 @@ from torchvision.utils import draw_bounding_boxes
 import torch as T
 from PIL.Image import blend
 
-from dataset_from_coco_annotations import DatasetFromCocoAnnotations
+from . import DatasetFromCocoAnnotations
 from transform import TransformAndAugment
 from dataset_config import DatasetConfig
 
