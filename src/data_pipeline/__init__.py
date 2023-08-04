@@ -1,10 +1,11 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 
 import json, os
 
 from .transform import TransformTraining, TransformTesting
+
 
 class DatasetFromCocoAnnotations(Dataset):
 
@@ -73,3 +74,23 @@ class DatasetFromCocoAnnotations(Dataset):
 
         else:
             return sample
+        
+
+def get_data_loaders(annotations_paths: list(str), 
+                     images_dir: str, 
+                     transform = None,
+                     batch_size: int = None,
+                     num_workers: int = 0,
+                     pin_memory: bool = False,
+                     drop_last: bool = False,
+                     shuffle: bool = False) -> list(DataLoader):
+    
+    return [DataLoader(dataset=DatasetFromCocoAnnotations(annotations_path=annotations_path,
+                                                         images_dir=images_dir,
+                                                         transform=transform),
+                       batch_size=batch_size,
+                       num_workers=num_workers,
+                       pin_memory=pin_memory,
+                       drop_last=drop_last,
+                       shuffle=shuffle) 
+                for annotations_path in annotations_paths]

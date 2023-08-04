@@ -1,45 +1,54 @@
 # import from third parties
 import torch as T
+from torch.utils.data import DataLoader
 
 # import from builtin (os, path, etc)
 # import sys
 
 # import from own packages
 from model import Model
-from data_pipeline import DatasetFromCocoAnnotations, TransformTraining, TransformTesting
+from data_pipeline import TransformTraining, TransformTesting, get_data_loaders
 from evaluation import Evaluate
+from config import Config
 
 debugging = True
 
 
 if __name__ == "__main__":
 
-    model = Model(encoder_name="resnet18", 
+    conf = Config()
+
+    model = Model(encoder_name="resnet18",  # TODO: maybe the following in config?
                 n_base_classes=100,
                 n_novel_classes=10,
                 head_base_heatmap_mode="CosHead",
                 head_novel_heatmap_mode="AdaptiveCosHead")
 
+
     # base dataset
-    dataset_base_train = DatasetFromCocoAnnotations(annotations_path="base_train.json", # TODO: change this path
-                                                    images_dir="always_the_same_dir",
-                                                    transform=TransformTraining())
+    dataset_base_train, \
+        dataset_novel_train = get_data_loaders(annotations_path=["base_train.json", # TODO: change this path (maybe put in config?)
+                                                                 "novel_train.json"], # TODO: change this path
+                                               images_dir="always_the_same_dir", # TODO: change this path
+                                               transform=TransformTraining(),
+                                               batch_size=conf.train_batch_size,
+                                               num_workers=conf.num_workers,
+                                               pin_memory=conf.pin_memory,
+                                               drop_last=conf.drop_last,
+                                               shuffle=True)
 
-    dataset_novel_train = DatasetFromCocoAnnotations(annotations_path="novel_train.json", # TODO: change this path
-                                                    images_dir="always_the_same_dir",
-                                                    transform=TransformTraining())
+    dataset_base_test, dataset_novel_test, \
+        dataset_full_test = get_data_loaders(annotations_path=["base_test.json", # TODO: change this path
+                                                               "novel_test.json", # TODO: change this path
+                                                               "full_test.json"], # TODO: change this path
+                                             images_dir="always_the_same_dir", # TODO: change this path
+                                             transform=TransformTesting(),
+                                             batch_size=conf.train_batch_size,
+                                             num_workers=conf.num_workers,
+                                             pin_memory=conf.pin_memory,
+                                             drop_last=conf.drop_last,
+                                             shuffle=False)
 
-    dataset_base_test = DatasetFromCocoAnnotations(annotations_path="base_test.json", # TODO: change this path
-                                                images_dir="always_the_same_dir",
-                                                transform=TransformTesting())
-
-    dataset_novel_test = DatasetFromCocoAnnotations(annotations_path="novel_test.json", # TODO: change this path
-                                                    images_dir="always_the_same_dir",
-                                                    transform=TransformTesting())
-
-    dataset_full_test = DatasetFromCocoAnnotations(annotations_path="full_test.json", # TODO: change this path
-                                                images_dir="always_the_same_dir",
-                                                transform=TransformTesting())
 
     if debugging:
         print("Dataset base train length: ", len(dataset_base_train))
@@ -48,8 +57,8 @@ if __name__ == "__main__":
 
 
     # first training on base_dataset: loss is ZERO on novel head
-    for sample, _, _ in dataset_base_train:
-        input_image, labels = sample
+    for sample_batched, _, _ in dataset_base_train:
+        input_image, labels = sample_batched
         # forward pass
         pass
 
@@ -64,9 +73,9 @@ if __name__ == "__main__":
             module[1].requires_grad_(False)
 
     # training on novel_dataset: loss on novel head is the one you used for base
-    for sample, _, _ in dataset_novel_train:
+    for sample_batched, _, _ in dataset_novel_train:
         # forward pass
-        input_image, labels = sample
+        input_image, labels = sample_batched
         pass
 
 

@@ -1,3 +1,3 @@
-import torch
+import os
 
-a = torch.randn(3,4,4)
+print(os.sched_getaffinity(0))
