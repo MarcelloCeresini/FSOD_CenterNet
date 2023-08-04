@@ -1,0 +1,40 @@
+# Model parameters:
+model:
+  encoder_name: resnet18
+  head_base_heatmap_mode: CosHead
+  head_novel_heatmap_mode: AdaptiveCosHead
+
+# Dataset parameters
+data:
+  base_classes: 100                     # If None, all non-novel classes will be used. 
+                                        # Otherwise, the number of base classes to sample.
+
+  novel_classes: 10                     # If None, the novel_class_list will be used instead.
+                                        # If both are none, all novel classes will be used. 
+                                        # Otherwise, the number of novel classes to sample.
+
+  novel_classes_list: null              # If novel_classes is null, this should be a list of 
+                                        # novel classes that we want to use. If both are null,
+                                        # all novel classes are used
+
+  use_fixed_sets: False                 # It's assumed that the JSON at train_annotations_path and val_annotations_path 
+                                        # are the original ones. This option can be set True for efficiency: 
+                                        # we can instead pass two pre-made train and validation sets + a novel train
+                                        # and a novel val sets that will directly be used.
+
+  K: 10                                 # The number of few shots for the novel classes. Can also be a list: in that case
+                                        # experiments will be repeated |K| times.
+
+paths:
+  images_dir: ../data                                         # Base folder for image paths
+  annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
+  novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
+  train_annotations_path: ../data/train_2017_bboxes.json      # The original training set, or a file to be used as training set (if use_fixed_sets = True)
+  val_annotations_path: ../data/val_2017_bboxes.json          # The original validation set, or a file to be used as validation set (if use_fixed_sets = True)
+  train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
+  val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set
+
+debug:
+  debug_mode_active: True
+
+device: cpu       # "cpu" or "cuda"
