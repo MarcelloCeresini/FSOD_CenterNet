@@ -1,12 +1,13 @@
 # import from third parties
 import torch as T
-from torch.utils.data import DataLoader
+from torch.optim import Adam
 
 # import from builtin (os, path, etc)
 # import sys
 
 # import from own packages
 from model import Model
+from training import train_one_epoch
 from data_pipeline import TransformTraining, TransformTesting, get_data_loaders
 from evaluation import Evaluate
 from config import Config
@@ -55,12 +56,8 @@ if __name__ == "__main__":
         sample, landmarks, original_image_size = dataset_base_train[0]
         # use "show_images.py" functions to show the sample / samples
 
-
-    # first training on base_dataset: loss is ZERO on novel head
-    for sample_batched, _, _ in dataset_base_train:
-        input_image, labels = sample_batched
-        # forward pass
-        pass
+    
+        
 
     # copy the weights of the first convolution from the first conv from the base head to the novel head
     with T.no_grad(): 
