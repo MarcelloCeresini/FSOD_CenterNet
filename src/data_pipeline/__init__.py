@@ -7,7 +7,7 @@ from tempfile import TemporaryFile
 
 from tqdm import tqdm
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 
 from pycocotools.coco import COCO
@@ -15,7 +15,7 @@ from pycocotools.coco import COCO
 from .transform import TransformTesting, TransformTraining
 
 
-class RuntimeDataset(Dataset):
+class DatasetFromCocoAnnotations(Dataset):
 
     def __init__(self, coco: COCO, images_dir: str, 
                  transform: TransformTesting | TransformTraining) -> None:
@@ -70,7 +70,7 @@ class RuntimeDataset(Dataset):
             return sample
 
 
-class DatasetsFromCocoAnnotations():
+class DatasetsGenerator():
 
     def __init__(self, 
                 annotations_path: str,
@@ -179,10 +179,24 @@ class DatasetsFromCocoAnnotations():
         '''
         Returns the train (base and novel) and validation (base and novel) sets for the current run.
         '''
-        return  RuntimeDataset(self.train_base, self.images_dir, TransformTraining()), \
-                RuntimeDataset(self.train_novel, self.images_dir, TransformTraining()), \
-                RuntimeDataset(self.val_base, self.images_dir, TransformTesting()), \
-                RuntimeDataset(self.val_novel, self.images_dir, TransformTesting())
+        return  DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()), \
+                DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()), \
+                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTesting()), \
+                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTesting())
+    
+
+    def generate_dataloaders(self, batch_size: int = None, num_workers: int = 0,
+                             pin_memory: bool = False, drop_last: bool = False, 
+                             shuffle: bool = False):
+        train_base, train_novel, val_base, val_novel = self.generate_datasets()
+        return  DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
+                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
+                DataLoader(dataset=train_novel, batch_size=batch_size, num_workers=num_workers,
+                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
+                DataLoader(dataset=val_base, batch_size=batch_size, num_workers=num_workers,
+                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
+                DataLoader(dataset=val_novel, batch_size=batch_size, num_workers=num_workers,
+                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle)
 
 
     def coco_merge(self, 

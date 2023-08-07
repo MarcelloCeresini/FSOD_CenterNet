@@ -8,6 +8,7 @@ from data_pipeline.transform import anti_transform_testing_after_model
 class Evaluate:
     '''
     Takes as input a model and a dataset WITHOUT TRANSFORMATIONS and evaluates the model
+    Oss: we don't need the labels in tensor form to compute the metrics
     '''
 
     def __init__(self,
@@ -68,7 +69,7 @@ class Evaluate:
             pred = self.model(image_for_model)
 
             complete_heatmaps = T.cat(pred[1], 
-                                  pred[2])
+                                      pred[2])
 
             idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
 

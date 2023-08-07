@@ -4,6 +4,19 @@ model:
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
+training:
+  batch_size: 64
+  num_workers: 1
+  pin_memory: True
+  drop_last: False
+  base:
+    lr: 0.001
+    epochs: 100
+  novel:
+    lr: 0.0001
+    epochs: 50
+  save_weights_path: ../data/test_weights.pt
+
 # Dataset parameters
 data:
   base_classes: 100                     # If None, all non-novel classes will be used. 
