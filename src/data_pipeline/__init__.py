@@ -73,122 +73,184 @@ class DatasetFromCocoAnnotations(Dataset):
 class DatasetsGenerator():
 
     def __init__(self, 
-                annotations_path: str,
-                images_dir: str, 
-                novel_class_ids_path: str,
-                train_set_path: str,
-                val_set_path: str,
-                use_fixed_sets: bool = False,
-                K: int = 10,
-                val_K: int = 20,
-                num_base_classes: int | None = 100,
-                num_novel_classes: int | None = 10,
-                novel_classes_list: List[int] | None = None,
-                novel_train_set_path: str | None = None,
-                novel_val_set_path: str | None = None,
-                to_be_shown: bool = False
+            annotations_path: str,
+            images_dir: str, 
+            novel_class_ids_path: str,
+            train_set_path: str,
+            val_set_path: str,
+            test_set_path: str,
+            use_fixed_novel_sets: bool = False,
+            novel_train_set_path: str | None = None,
+            novel_val_set_path: str | None = None,
+            novel_test_set_path: str | None = None,
     ) -> None:
         
-        self.images_dir = images_dir
+        self.images_dir         = images_dir
 
-        # Check if we should select a new training/validation set or use the given ones
-        if use_fixed_sets:
-            assert novel_train_set_path is not None, 'Novel train set path must not be None in fixed set mode'
-            assert novel_val_set_path is not None, 'Novel val set path must not be None in fixed set mode'
+        self.annotations_path   = annotations_path
+        self.train_set_path     = train_set_path
+        self.val_set_path       = val_set_path
+        self.test_set_path      = test_set_path
+
+        self.train_base         = COCO(train_set_path)
+        self.val_base           = COCO(val_set_path)
+        self.test_base          = COCO(test_set_path)
+
+        self.use_fixed_novel_sets   = use_fixed_novel_sets
+        self.novel_train_set_path   = novel_train_set_path
+        self.novel_val_set_path     = novel_val_set_path
+        self.novel_test_set_path    = novel_test_set_path
+
+        self.novel_class_ids_path   = novel_class_ids_path
+
+
+        # Check if we should select a new split of the set or use the given ones
+        if self.use_fixed_novel_sets:
+            assert self.novel_train_set_path is not None, 'Novel train set path must not be None in fixed set mode'
+            assert self.novel_val_set_path is not None, 'Novel val set path must not be None in fixed set mode'
+            assert self.novel_test_set_path is not None, 'Novel test set path must not be None in fixed set mode'
             
             # No further checks are done, so make sure that the annotation files are ok
-            self.train_base     = COCO(train_set_path)
-            self.val_base       = COCO(val_set_path)
-            self.train_novel    = COCO(novel_train_set_path)
-            self.val_novel      = COCO(novel_val_set_path)
-
+            self.train_novel    = COCO(self.novel_train_set_path)
+            self.val_novel      = COCO(self.novel_val_set_path)
+            self.test_novel     = COCO(self.novel_test_set_path)
+        
         else:
+            self.setup()
 
-            # Open the full annotations file if it exist, otherwise create it
-            if not os.path.exists(annotations_path):
-                print("Creating full annotations file...")
-                self.coco_merge(train_set_path, val_set_path, annotations_path)
 
-            with open(annotations_path, 'r') as f:
-                full_annotations = json.load(f)
+    def setup(self):
 
-            # Create a COCO object to access its API
-            coco_dset = COCO(annotations_path)
+        # Open the full annotations file if it exist, otherwise create it
+        if not os.path.exists(self.annotations_path):
+            print("Creating full annotations file...")
+            with TemporaryFile('w+') as fp:
+                self.coco_merge(self.train_set_path, self.val_set_path, fp.name)
+                self.coco_merge(fp.name, self.test_set_path, self.annotations_path)
+        with open(self.annotations_path, 'r') as f:
+            self.full_annotations = json.load(f)
+        # Create a COCO object to access its API
+        self.coco_dset = COCO(self.annotations_path)
 
-            # Load the IDs of the pre-selected novel classes
-            with open(novel_class_ids_path, 'r') as f:
-                novel_classes = json.load(f)['novel_cat_ids']
+        # Load the IDs of the pre-selected novel classes
+        with open(self.novel_class_ids_path, 'r') as f:
+            self.novel_classes = json.load(f)['novel_cat_ids']
+
+    def _sample_novel_set(self, 
+                          sampleable_novel_classes: List[int], 
+                          K: int,
+                          default_set_path: str,
+                          do_not_sample: Dict[int, List[int]] = None) -> COCO:
+        # Use our algorithm to collect exactly K annotations for each of the sampleable novel classes
+        
+        try:
+            annots = self.create_annotation_sets_with_K_shots(
+                self.coco_dset, sampleable_novel_classes, K = K, 
+                do_not_sample = do_not_sample, timeout = 10
+            )
+        except TimeoutError as e:
+            print(e)
+            # Fallback to default set
+            if os.path.exists(default_set_path):
+                return COCO(default_set_path)
+            else:
+                raise FileNotFoundError('Default novel set not found.')
+            
+        novel_set = self.convert_k_shot_algo_to_coco(annots, self.full_annotations)
+        with TemporaryFile('w+') as fp:
+            json.dump(novel_set, fp)
+            return COCO(fp.name), annots
+
+
+    def _generate_new_novel_sets(self, 
+                                 K: int, val_K: int, test_K: int,
+                                 num_novel_classes_to_sample: int | None = None, 
+                                 novel_classes_to_sample_list: List | None = None,
+                                 random_seed: int | None = None):
+        
+        if not num_novel_classes_to_sample and not novel_classes_to_sample_list:
+            print("\n\nYou did not specify a number of novel classes to sample nor "
+                  "a list of novel classes to allow: this means that all novel classes "
+                  "will be used: be aware of that!\n\n")
+
+        self.random_gen = random.Random(random_seed)
+        # Starting from here, all calls made to the random generator will be deterministic
+        # as long as they will be the same number of calls 
+
+        if not self.use_fixed_novel_sets:
 
             # Check if we don't want to use all novel classes
-            if num_novel_classes is not None:
-                # Here we want to sample exactly num_novel_classes
-                assert num_novel_classes > 0, f'We should sample more than {num_novel_classes} base classes.'
-                sampleable_novel_classes = random.sample(novel_classes, k=num_novel_classes)
-            elif novel_classes_list is not None:
+            if novel_classes_to_sample_list is not None:
                 # Here we want to use exactly the defined novel classes
-                sampleable_novel_classes = novel_classes_list
+                sampleable_novel_classes = novel_classes_to_sample_list
+            elif num_novel_classes_to_sample is not None:
+                # Here we want to sample exactly num_novel_classes
+                assert num_novel_classes_to_sample > 0, f'We should sample more than {num_novel_classes_to_sample} base classes.'
+                sampleable_novel_classes = random.sample(self.novel_classes, k=num_novel_classes_to_sample)
             else:
                 # Here we want to use all the novel classes
-                sampleable_novel_classes = novel_classes
+                sampleable_novel_classes = self.novel_classes
 
-            # Use our algorithm to collect exactly K annotations for each of the sampleable novel classes
-            try:
-                train_annots = self.create_annotation_sets_with_K_shots(
-                    coco_dset, sampleable_novel_classes, K = K, timeout = 10
-                )
-            except TimeoutError as e:
-                print(e)
-                # Fallback to default training set
-                if os.path.exists(novel_train_set_path):
-                    with open(novel_train_set_path, "r") as f:
-                        self.train_novel = json.load(f)
-                else:
-                    raise FileNotFoundError('Default novel train set not found.')
-                
-            # The validation set should not sample from the images in the training set
-            try:
-                val_annots = self.create_annotation_sets_with_K_shots(
-                    coco_dset, sampleable_novel_classes, K = val_K, 
-                    do_not_sample = train_annots, timeout = 10
-                )
-            except TimeoutError as e:
-                print(e)    
-                # Fallback to default training set
-                if os.path.exists(novel_val_set_path):
-                    with open(novel_val_set_path, "r") as f:
-                        self.val_novel = json.load(f)
-                else:
-                    raise FileNotFoundError('Default novel val set not found.')
-                
-            # Now we should convert the output from the algorithm into COCO format
-            novel_train_set = self.convert_k_shot_algo_to_coco(train_annots, full_annotations)
-            novel_val_set   = self.convert_k_shot_algo_to_coco(val_annots, full_annotations)
-            # Cursing against COCO api because it does not accept COCO-ready dicts but it wants files,
-            # we create a temporary file with our dictionary
-            with TemporaryFile('w+') as fp:
-                json.dump(novel_train_set, fp)
-                self.train_novel = COCO(fp.name)
-            with TemporaryFile('w+') as fp:
-                json.dump(novel_val_set, fp)
-                self.val_novel = COCO(fp.name)
-            
-            # TODO: deal with base classes
+            # Sample the novel classes
+            self.train_novel, train_samples = self._sample_novel_set(sampleable_novel_classes, K, 
+                                                      self.novel_train_set_path, 
+                                                      do_not_sample = None)
+            self.val_novel, val_samples     = self._sample_novel_set(sampleable_novel_classes, val_K,
+                                                      self.novel_val_set_path,
+                                                      do_not_sample = train_samples)
+            self.test_novel, test_samples   = self._sample_novel_set(sampleable_novel_classes, test_K,
+                                                      self.novel_test_set_path,
+                                                      do_not_sample = {k: train_samples[k] + val_samples[k]
+                                                                       for k in train_samples})
 
-
-    def generate_datasets(self):
+    def generate_datasets(self, K: int, val_K: int, test_K: int,
+                            num_novel_classes_to_sample: int | None = None, 
+                            novel_classes_to_sample_list: List | None = None,
+                            random_seed: int | None = None):
         '''
-        Returns the train (base and novel) and validation (base and novel) sets for the current run.
+        Returns, in order:
+        - The training base dataset
+        - The training novel dataset
+        - The validation base dataset
+        - The validation novel dataset
+        - The test base dataset
+        - The test novel dataset
         '''
+        self._generate_new_novel_sets(K, val_K, test_K, num_novel_classes_to_sample, 
+                                      novel_classes_to_sample_list, random_seed)
         return  DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()), \
                 DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()), \
-                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTesting()), \
-                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTesting())
+                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()), \
+                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining()), \
+                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting()), \
+                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting()), \
     
 
-    def generate_dataloaders(self, batch_size: int = None, num_workers: int = 0,
-                             pin_memory: bool = False, drop_last: bool = False, 
+    def generate_dataloaders(self, 
+                             K: int, 
+                             val_K: int, 
+                             test_K: int,
+                             num_novel_classes_to_sample: int | None = None, 
+                             novel_classes_to_sample_list: List | None = None,
+                             gen_random_seed: int | None = None,
+                             batch_size: int = None, 
+                             num_workers: int = 0,
+                             pin_memory: bool = False, 
+                             drop_last: bool = False, 
                              shuffle: bool = False):
-        train_base, train_novel, val_base, val_novel = self.generate_datasets()
+        '''
+        Returns, in order:
+        - The training base dataloader
+        - The training novel dataloader
+        - The validation base dataloader
+        - The validation novel dataloader
+        - The test base dataloader
+        - The test novel dataloader
+        '''
+        train_base, train_novel, val_base, val_novel = self.generate_datasets(K, val_K, test_K, 
+                                                                              num_novel_classes_to_sample,
+                                                                              novel_classes_to_sample_list,
+                                                                              random_seed=gen_random_seed)
         return  DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
                             pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
                 DataLoader(dataset=train_novel, batch_size=batch_size, num_workers=num_workers,
