@@ -208,22 +208,20 @@ class DatasetsGenerator():
                             novel_classes_to_sample_list: List | None = None,
                             random_seed: int | None = None):
         '''
-        Returns, in order:
-        - The training base dataset
-        - The training novel dataset
-        - The validation base dataset
-        - The validation novel dataset
-        - The test base dataset
-        - The test novel dataset
+        Returns two tuples: one containing train, val, test splits for the base set and the other containing
+        train, val, test splits for the novel set. Each split is a `DatasetFromCocoAnnotations` object.
         '''
         self._generate_new_novel_sets(K, val_K, test_K, num_novel_classes_to_sample, 
                                       novel_classes_to_sample_list, random_seed)
-        return  DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()), \
-                DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()), \
-                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()), \
-                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining()), \
-                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting()), \
-                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting()), \
+        return (
+                DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()),
+                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()),
+                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting())
+            ), (
+                DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()),
+                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining()),
+                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting())
+            )
     
 
     def generate_dataloaders(self, 
@@ -239,26 +237,27 @@ class DatasetsGenerator():
                              drop_last: bool = False, 
                              shuffle: bool = False):
         '''
-        Returns, in order:
-        - The training base dataloader
-        - The training novel dataloader
-        - The validation base dataloader
-        - The validation novel dataloader
-        - The test base dataloader
-        - The test novel dataloader
+        Returns two tuples: one containing train, val, test splits for the base set and the other containing
+        train, val, test splits for the novel set. Each split is a `DataLoader` object.
         '''
-        train_base, train_novel, val_base, val_novel = self.generate_datasets(K, val_K, test_K, 
-                                                                              num_novel_classes_to_sample,
-                                                                              novel_classes_to_sample_list,
-                                                                              random_seed=gen_random_seed)
-        return  DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
-                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
-                DataLoader(dataset=train_novel, batch_size=batch_size, num_workers=num_workers,
-                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
+        (train_base, val_base, test_base), (train_novel, val_novel, test_novel) = \
+            self.generate_datasets(K, val_K, test_K, num_novel_classes_to_sample, 
+                                   novel_classes_to_sample_list, random_seed=gen_random_seed)
+        return  (
+                DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
+                                pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
                 DataLoader(dataset=val_base, batch_size=batch_size, num_workers=num_workers,
-                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle), \
-                DataLoader(dataset=val_novel, batch_size=batch_size, num_workers=num_workers,
+                                pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
+                DataLoader(dataset=test_base, batch_size=batch_size, num_workers=num_workers,
                             pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle)
+            ), (
+                DataLoader(dataset=train_novel, batch_size=batch_size, num_workers=num_workers,
+                                pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
+                DataLoader(dataset=val_novel, batch_size=batch_size, num_workers=num_workers,
+                                pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
+                DataLoader(dataset=test_novel, batch_size=batch_size, num_workers=num_workers,
+                            pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle)
+            )
 
 
     def coco_merge(self, 

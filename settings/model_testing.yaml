@@ -19,10 +19,10 @@ training:
 
 # Dataset parameters
 data:
-  base_classes: 100                     # If None, all non-novel classes will be used. 
-                                        # Otherwise, the number of base classes to sample.
+  gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
+                                        # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
 
-  novel_classes: 10                     # If None, the novel_class_list will be used instead.
+  novel_classes_to_sample: 10           # If None, the novel_class_list will be used instead.
                                         # If both are none, all novel classes will be used. 
                                         # Otherwise, the number of novel classes to sample.
 
@@ -37,15 +37,23 @@ data:
 
   K: 10                                 # The number of few shots for the novel classes. Can also be a list: in that case
                                         # experiments will be repeated |K| times.
+  
+  val_K: 20                             # The number of few shots for the novel classes in the val dataset. 
+                                        # Can also be a list: in that case experiments will be repeated |K| times.
+
+  test_K: 20                            # The number of few shots for the novel classes in the test dataset. 
+                                        # Can also be a list: in that case experiments will be repeated |K| times.
 
 paths:
   images_dir: ../data                                         # Base folder for image paths
   annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
   novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
-  train_annotations_path: ../data/train_2017_bboxes.json      # The original training set, or a file to be used as training set (if use_fixed_sets = True)
-  val_annotations_path: ../data/val_2017_bboxes.json          # The original validation set, or a file to be used as validation set (if use_fixed_sets = True)
+  train_annotations_path: ../data/train_2017_bboxes.json      # The original training set
+  val_annotations_path: ../data/val_2017_bboxes.json          # The original validation set
+  test_annotations_path: ../data/test_2017_bboxes.json        # The original test set
   train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
   val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set
+  test_novel_annotations_path: null                           # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel test set
 
 debug:
   debug_mode_active: True

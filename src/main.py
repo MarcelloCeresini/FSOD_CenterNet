@@ -31,36 +31,45 @@ def main(args):
         f"Weights path {conf['training']['save_weights_path']} already exists, will not overwrite, so delte it first or change the path."
 
     K = conf['data']['K']
-    val_K = conf['data']['K']
+    val_K = conf['data']['val_K']
+    test_K = conf['data']['test_K']
 
     if isinstance(K, list):
         # If K is a list of Ks to try, we should retry the following experiments multiple times (?)
         # Note: in that case we should assume that val_K is a list too.
         raise NotImplementedError
 
-    # base dataset
+    # Dataset generator. Only one of these has to be instantiated. It always returns
     dataset_gen = DatasetsGenerator(
         annotations_path = conf['paths']['annotations_path'],
         images_dir = conf['paths']['images_dir'],
         novel_class_ids_path = conf['paths']['novel_classes_ids_path'],
-        use_fixed_sets = conf['data']['use_fixed_sets'],
         train_set_path = conf['data']['train_annotations_path'],
         val_set_path = conf['data']['val_annotations_path'],
-        K = K, 
-        val_K = val_K,
-        num_base_classes = conf['data']['base_classes'],
-        num_novel_classes = conf['data']['novel_classes'],
+        test_set_path = conf['data']['test_annotations_path'],
+        use_fixed_sets = conf['data']['use_fixed_sets'],
         novel_classes_list = conf['data']['novel_classes_list'],
         novel_train_set_path = conf['data']['val_novel_annotations_path'],
         novel_val_set_path = conf['paths']['train_novel_annotations_path'],
     )
 
-    dataset_base_train, dataset_novel_train, \
-    dataset_base_val, dataset_novel_val = dataset_gen.generate_datasets()
+    (dataset_base_train, dataset_base_val, dataset_base_test), \
+    (dataset_novel_train, dataset_novel_val, dataset_novel_test) = \
+        dataset_gen.generate_dataloaders(
+            K=K, val_K=val_K, test_K=test_K,
+            num_novel_classes_to_sample=conf['data']['novel_classes_to_sample'],
+            novel_classes_to_sample_list=conf['data']['novel_classes_list'],
+            gen_random_seed=conf['data']['gen_random_seed'],
+            batch_size=conf['training']['batch_size'],
+            num_workers=conf['training']['num_workers'],
+            pin_memory=conf['training']['pin_memory'],
+            drop_last=conf['training']['drop_last'],
+            shuffle=True
+        )
 
     model = Model(  encoder_name = conf['model']['encoder_name'], 
-                    n_base_classes = conf['data']['base_classes'],
-                    n_novel_classes = conf['data']['novel_classes'],
+                    n_base_classes = len(dataset_gen.train_base.cats),
+                    n_novel_classes = len(dataset_gen.train_novel.cats),
                     head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'],
                     head_novel_heatmap_mode = conf['model']['head_novel_heatmap_mode'])
     model = model.to(device)
@@ -89,22 +98,22 @@ def main(args):
     # evaluation on base_dataset
     metrics_base = Evaluate(model, dataset_base_test)
     
-    # train and eval novel
-    metrics_novel_list = []
-    for i, (dataset_novel_train, dataset_novel_val, dataset_novel_test) in enumerate(dataset_novel_list):
-        print(f"Training on novel dataset n°{i} out of {len(dataset_novel_list)}")
-        model.load_state_dict(T.load(weights_path))
+    # # train and eval novel
+    # metrics_novel_list = []
+    # for i, (dataset_novel_train, dataset_novel_val, dataset_novel_test) in enumerate(dataset_novel_list):
+    #     print(f"Training on novel dataset n°{i} out of {len(dataset_novel_list)}")
+    #     model.load_state_dict(T.load(weights_path))
 
-        # freeze the weights of everything except the novel head
-        model = set_model_to_train_novel(model)
+    #     # freeze the weights of everything except the novel head
+    #     model = set_model_to_train_novel(model)
 
 
 
-        # evaluation on novel_dataset
-        metrics_novel = Evaluate(model, dataset_novel_test)
+    #     # evaluation on novel_dataset
+    #     metrics_novel = Evaluate(model, dataset_novel_test)
 
-        # aggregation and print results
-        metrics_full = Evaluate(model, dataset_full_test)
+    #     # aggregation and print results
+    #     metrics_full = Evaluate(model, dataset_full_test)
     
     '''
     - ``map_dict``: A dictionary containing the following key-values:
