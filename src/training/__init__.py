@@ -1,3 +1,4 @@
+import os
 import torch as T
 
 import datetime
@@ -19,12 +20,16 @@ def train_loop_base(model,
                     training_loader_base,
                     validation_loader_base,
                     optimizer,
-                    name="standard_model"):
+                    weights_path,
+                    model_name) -> str:
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     # writer = SummaryWriter('runs/fashion_trainer_{}'.format(timestamp))
     
     print("Training base started")
+
+    best_vloss = 1e10
+    best_model_path = None
 
     for epoch in range(epochs):
         print('EPOCH {}:'.format(epoch + 1))
@@ -74,6 +79,8 @@ def train_loop_base(model,
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            if name:
-                model_path = '{}_{}_{}'.format(name, timestamp, epoch)
+            model_path = os.path.join(weights_path, '{}_{}_{}.pt'.format(model_name, timestamp, epoch))
             T.save(model.state_dict(), model_path)
+            best_model_path = model_path
+
+    return best_model_path

@@ -15,7 +15,10 @@ training:
   novel:
     lr: 0.0001
     epochs: 50
-  save_weights_path: ../data/test_weights.pt
+  repeat_novel_training: 1
+  save_base_weights_dir: ../data/weights/
+  save_novel_weights_dir: ../data/weights/novel/
+  save_training_info_dir: ../data/training_info/
 
 # Dataset parameters
 data:

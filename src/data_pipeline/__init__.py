@@ -203,6 +203,26 @@ class DatasetsGenerator():
                                                       do_not_sample = {k: train_samples[k] + val_samples[k]
                                                                        for k in train_samples})
 
+
+    def get_base_sets(self):
+        return (
+            DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()),
+            DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()),
+            DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting())
+        )
+    
+    def get_base_sets_dataloaders(self, batch_size = None, num_workers = 1, pin_memory = True,
+                                  drop_last = False, shuffle = True):
+        train_base, val_base, test_base = self.get_base_sets()
+        return (
+            DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
+                        pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
+            DataLoader(dataset=val_base, batch_size=batch_size, num_workers=num_workers,
+                        pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle),
+            DataLoader(dataset=test_base, batch_size=batch_size, num_workers=num_workers,
+                        pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle)
+        )
+
     def generate_datasets(self, K: int, val_K: int, test_K: int,
                             num_novel_classes_to_sample: int | None = None, 
                             novel_classes_to_sample_list: List | None = None,
@@ -213,11 +233,7 @@ class DatasetsGenerator():
         '''
         self._generate_new_novel_sets(K, val_K, test_K, num_novel_classes_to_sample, 
                                       novel_classes_to_sample_list, random_seed)
-        return (
-                DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()),
-                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()),
-                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting())
-            ), (
+        return self.get_base_sets(), (
                 DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()),
                 DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining()),
                 DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting())

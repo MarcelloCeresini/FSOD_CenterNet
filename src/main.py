@@ -1,14 +1,16 @@
 import argparse
 import os
-import yaml
+import pickle
 
 import torch as T
+import yaml
 from torch.optim import Adam
 
 from data_pipeline import DatasetsGenerator
 from evaluation import Evaluate
 from model import Model
-from training import train_loop_base, set_model_to_train_novel
+from training import set_model_to_train_novel, train_loop_base
+
 
 def parse_args():
     arps = argparse.ArgumentParser()
@@ -33,11 +35,14 @@ def main(args):
     K = conf['data']['K']
     val_K = conf['data']['val_K']
     test_K = conf['data']['test_K']
+    n_repeats_novel_train = conf['data']['repeat_novel_training']
 
-    if isinstance(K, list):
-        # If K is a list of Ks to try, we should retry the following experiments multiple times (?)
-        # Note: in that case we should assume that val_K is a list too.
-        raise NotImplementedError
+    if isinstance(K, int):
+        K = [K]
+    if isinstance(val_K, int):
+        val_K = [val_K]
+    if isinstance(test_K, int):
+        test_K = [test_K]
 
     # Dataset generator. Only one of these has to be instantiated. It always returns
     dataset_gen = DatasetsGenerator(
@@ -53,20 +58,13 @@ def main(args):
         novel_val_set_path = conf['paths']['train_novel_annotations_path'],
     )
 
-    (dataset_base_train, dataset_base_val, dataset_base_test), \
-    (dataset_novel_train, dataset_novel_val, dataset_novel_test) = \
-        dataset_gen.generate_dataloaders(
-            K=K, val_K=val_K, test_K=test_K,
-            num_novel_classes_to_sample=conf['data']['novel_classes_to_sample'],
-            novel_classes_to_sample_list=conf['data']['novel_classes_list'],
-            gen_random_seed=conf['data']['gen_random_seed'],
-            batch_size=conf['training']['batch_size'],
-            num_workers=conf['training']['num_workers'],
-            pin_memory=conf['training']['pin_memory'],
-            drop_last=conf['training']['drop_last'],
-            shuffle=True
-        )
+    # Use the dataset generator to generate the base set
+    dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
+        conf['training']['batch_size'], conf['training']['num_workers'],
+        conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
+    )
 
+    # Instantiate the model
     model = Model(  encoder_name = conf['model']['encoder_name'], 
                     n_base_classes = len(dataset_gen.train_base.cats),
                     n_novel_classes = len(dataset_gen.train_novel.cats),
@@ -81,39 +79,74 @@ def main(args):
 
     optimizer_base = Adam(model.parameters(), lr=conf['training']['base']['lr'])
     
-    weights_path = train_loop_base(model,
-                                   epochs=conf['training']['base']['epochs'],
-                                   training_loader=dataset_base_train,
-                                   validation_loader=dataset_base_val,
-                                   optimizer=optimizer_base,
-                                   name="standard_model_base")
+    # Train the base model
+    best_base_weights = train_loop_base(model,
+        epochs=conf['training']['base']['epochs'],
+        training_loader=dataset_base_train,
+        validation_loader=dataset_base_val,
+        optimizer=optimizer_base,
+        weights_path=conf['training']['save_base_weights_path'],
+        name="standard_model_base")
 
-    # copy the weights of the first convolution from the first conv from the base head to the novel head
-    with T.no_grad(): 
-        model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
-        model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
-
-    T.save(model.state_dict(), conf.weights_path) # TODO: decide a path
-
-    # evaluation on base_dataset
+    # Evaluation on base test dataset
     metrics_base = Evaluate(model, dataset_base_test)
     
-    # # train and eval novel
-    # metrics_novel_list = []
-    # for i, (dataset_novel_train, dataset_novel_val, dataset_novel_test) in enumerate(dataset_novel_list):
-    #     print(f"Training on novel dataset n°{i} out of {len(dataset_novel_list)}")
-    #     model.load_state_dict(T.load(weights_path))
+    with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
+        pickle.dump(metrics_base, f)
 
-    #     # freeze the weights of everything except the novel head
-    #     model = set_model_to_train_novel(model)
+    ## NOVEL TRAININGS ##
 
+    # Train and eval novel
+    metrics_novel_list = []
+    total_trainings = len(K) * n_repeats_novel_train
+    for i in range(total_trainings):
+        print(f"\nTraining on novel dataset n°{i} out of {total_trainings}")
 
+        current_train_K = K[i % n_repeats_novel_train]
+        current_val_K   = val_K[i % n_repeats_novel_train]
+        current_test_K  = test_K[i % n_repeats_novel_train]
 
-    #     # evaluation on novel_dataset
-    #     metrics_novel = Evaluate(model, dataset_novel_test)
+        # Load weights from base model
+        model.load_state_dict(T.load(best_base_weights))
+        # Copy the weights of the first convolution from the first conv from the base head to the novel head
+        with T.no_grad(): 
+            model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
+            model.head_novel_heatmap.conv1.bias.data   = model.head_base_heatmap.conv1.bias.data
+        # Freeze the weights of everything except the novel head
+        model = set_model_to_train_novel(model)
 
-    #     # aggregation and print results
-    #     metrics_full = Evaluate(model, dataset_full_test)
+        # Optimizer
+        optimizer_novel = Adam(model.parameters(), lr=conf['training']['novel']['lr'])
+
+        # Obtain dataset from generator
+        # Use the dataset generator to generate the base set
+        _, (dataset_novel_train, dataset_novel_val, dataset_novel_test) = \
+            dataset_gen.generate_dataloaders(
+                K=current_train_K, val_K=current_val_K, test_K=current_test_K,
+                num_novel_classes_to_sample=conf['data']['novel_classes_to_sample'],
+                novel_classes_to_sample_list=conf['data']['novel_classes_list'],
+                gen_random_seed=conf['data']['gen_random_seed'],
+                batch_size=conf['training']['batch_size'],
+                num_workers=conf['training']['num_workers'],
+                pin_memory=conf['training']['pin_memory'],
+                drop_last=conf['training']['drop_last'],
+                shuffle=True
+            )
+
+        best_novel_weights_for_params = train_loop_base(model,
+            epochs=conf['training']['novel']['epochs'],
+            training_loader=dataset_novel_train,
+            validation_loader=dataset_novel_val,
+            optimizer=optimizer_novel,
+            weights_path=conf['training']['save_novel_weights_dir']
+            name=f"novel_model_K_{current_train_K}_{i // n_repeats_novel_train}")
+        
+        # Evaluation on novel_dataset
+        metrics_novel = Evaluate(model, dataset_novel_test)
+        metrics_novel_list.append(metrics_novel)
+    
+    with open(os.path.join(conf['training']['save_training_info_dir'], 'novel_training_info.pkl'), 'wb') as f:
+        pickle.dump(metrics_novel_list, f)
     
     '''
     - ``map_dict``: A dictionary containing the following key-values:
