@@ -51,9 +51,11 @@ paths:
   images_dir: ../data                                         # Base folder for image paths
   annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
   novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
-  train_annotations_path: ../data/train_2017_bboxes.json      # The original training set
-  val_annotations_path: ../data/val_2017_bboxes.json          # The original validation set
-  test_annotations_path: ../data/test_2017_bboxes.json        # The original test set
+  
+  train_base_annotations_path: ../data/base_dset/train.json   # The base train set
+  val_base_annotations_path  : ../data/base_dset/val.json     # The base validation set
+  test_base_annotations_path : ../data/base_dset/test.json    # The base test set
+  
   train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
   val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set
   test_novel_annotations_path: null                           # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel test set

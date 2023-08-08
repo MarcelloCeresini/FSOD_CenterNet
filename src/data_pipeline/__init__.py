@@ -121,12 +121,7 @@ class DatasetsGenerator():
 
     def setup(self):
 
-        # Open the full annotations file if it exist, otherwise create it
-        if not os.path.exists(self.annotations_path):
-            print("Creating full annotations file...")
-            with TemporaryFile('w+') as fp:
-                self.coco_merge(self.train_set_path, self.val_set_path, fp.name)
-                self.coco_merge(fp.name, self.test_set_path, self.annotations_path)
+        # Open the full annotations file
         with open(self.annotations_path, 'r') as f:
             self.full_annotations = json.load(f)
         # Create a COCO object to access its API
@@ -274,72 +269,6 @@ class DatasetsGenerator():
                 DataLoader(dataset=test_novel, batch_size=batch_size, num_workers=num_workers,
                             pin_memory=pin_memory, drop_last=drop_last, shuffle=shuffle)
             )
-
-
-    def coco_merge(self, 
-                   input_extend: str, 
-                   input_add: str, 
-                   output_file: str, 
-                   indent: int | None = None,
-    ) -> str:
-        """Merge COCO annotation files.
-        Source: Code taken from https://gradiant.github.io/pyodi/reference/apps/coco-merge/#pyodi.apps.coco.coco_merge.coco_merge
-
-        Args:
-            input_extend: Path to input file to be extended.
-            input_add: Path to input file to be added.
-            output_file : Path to output file with merged annotations.
-            indent: Argument passed to `json.dump`. See https://docs.python.org/3/library/json.html#json.dump.
-        """
-        with open(input_extend, "r") as f:
-            data_extend = json.load(f)
-        with open(input_add, "r") as f:
-            data_add = json.load(f)
-
-        output: Dict[str, Any] = {
-            k: data_extend[k] for k in data_extend if k not in ("images", "annotations")
-        }
-
-        output["images"], output["annotations"] = [], []
-
-        for i, data in enumerate([data_extend, data_add]):
-
-            cat_id_map = {}
-            for new_cat in data["categories"]:
-                new_id = None
-                for output_cat in output["categories"]:
-                    if new_cat["name"] == output_cat["name"]:
-                        new_id = output_cat["id"]
-                        break
-
-                if new_id is not None:
-                    cat_id_map[new_cat["id"]] = new_id
-                else:
-                    new_cat_id = max(c["id"] for c in output["categories"]) + 1
-                    cat_id_map[new_cat["id"]] = new_cat_id
-                    new_cat["id"] = new_cat_id
-                    output["categories"].append(new_cat)
-
-            img_id_map = {}
-            for image in data["images"]:
-                n_imgs = len(output["images"])
-                img_id_map[image["id"]] = n_imgs
-                image["id"] = n_imgs
-
-                output["images"].append(image)
-
-            for annotation in data["annotations"]:
-                n_anns = len(output["annotations"])
-                annotation["id"] = n_anns
-                annotation["image_id"] = img_id_map[annotation["image_id"]]
-                annotation["category_id"] = cat_id_map[annotation["category_id"]]
-
-                output["annotations"].append(annotation)
-
-        with open(output_file, "w") as f:
-            json.dump(output, f, indent=indent)
-
-        return output_file
 
     
     def create_annotation_sets_with_K_shots(
