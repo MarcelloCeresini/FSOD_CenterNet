@@ -1,7 +1,7 @@
 import os
 import torch as T
 
-import datetime
+from datetime import datetime
 
 from .train_one_epoch import train_one_epoch_base
 from .losses import heatmap_loss_batched, reg_loss_batched

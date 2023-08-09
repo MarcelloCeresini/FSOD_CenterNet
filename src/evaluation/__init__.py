@@ -15,9 +15,10 @@ class Evaluate:
                  model, 
                  dataset):
         
-        self.model = model
+        self.model   = model
         self.dataset = dataset
-        self.stride = self.dataset.transform.conf.output_stride
+        # TODO: not clear what you're trying to get here but dataloader has no attibute transform
+        self.stride  = self.dataset.transform.conf.output_stride
 
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 

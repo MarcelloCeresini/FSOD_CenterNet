@@ -1,7 +1,7 @@
 import torch as T
 from torch.func import vmap
 
-from ..model.config import Config
+from model.config import Config
 
 conf = Config()
 

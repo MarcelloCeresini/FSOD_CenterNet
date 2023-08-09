@@ -1,7 +1,7 @@
 import torch as T
 import numpy as np
 
-from dataset_config import DatasetConfig
+from .dataset_config import DatasetConfig
 
 class LandmarksToLabels:
     def __init__(self,

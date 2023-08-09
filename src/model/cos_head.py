@@ -9,10 +9,12 @@ class CosHead(Module):
                  mode: str) -> None:
         super().__init__()
 
-        self.range_extender = Config().range_extender_cos_head
+        self.config = Config()
+
+        self.range_extender = self.config.range_extender_cos_head
 
         self.n_classes = n_classes
-        self.latent_dim = Config().head_heatmap_latent_dim
+        self.latent_dim = self.config.head_heatmap_latent_dim
         
         self.weights = Parameter(randn(self.n_classes, 
                                        self.latent_dim))

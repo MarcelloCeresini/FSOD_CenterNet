@@ -1,10 +1,11 @@
+from typing import Tuple
 import torch as T
 from torchvision.transforms import ColorJitter, Compose, GaussianBlur
 
 
-from dataset_config import DatasetConfig
-from own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
-from landmarks_to_labels import LandmarksToLabels
+from .dataset_config import DatasetConfig
+from .own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
+from .landmarks_to_labels import LandmarksToLabels
 
 class TransformTraining:
     def __init__(self,
@@ -87,7 +88,7 @@ class TransformTesting:
 
 def anti_transform_testing_after_model(current_image,
                                        landmarks,
-                                       original_image_size) -> tuple(T.tensor):
+                                       original_image_size) -> Tuple[T.tensor]:
     '''
     Returns the landmarks in the original image size after the output of the model
     '''
