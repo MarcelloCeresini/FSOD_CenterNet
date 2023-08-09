@@ -2,11 +2,12 @@ import json
 import os
 import random
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, Optional, Sized
 from tempfile import TemporaryFile
 
 from tqdm import tqdm
 
+import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 
@@ -23,6 +24,8 @@ class DatasetFromCocoAnnotations(Dataset):
         self.coco = coco
         self.images_dir = images_dir
         self.transform = transform
+        self.idx_to_img = {i: coco.loadImgs(ids=[img])[0]
+                           for i, img in enumerate(self.coco.imgs)}
 
     def __len__(self):
         return len(self.coco.imgs)
@@ -41,10 +44,10 @@ class DatasetFromCocoAnnotations(Dataset):
                 - image_id
             - original_image_size
         '''
-        current_image_id = self.coco.imgs[idx]["id"]
+        current_image_id = self.idx_to_img[idx]['id']
 
         img_name = os.path.join(self.images_dir,
-                                self.coco.imgs[idx]["file_name"])
+                                self.idx_to_img[idx]['file_name'])
 
         image = read_image(img_name)
 

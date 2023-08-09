@@ -16,7 +16,7 @@ training:
     lr: 0.0001
     epochs: 50
   repeat_novel_training: 1
-  save_base_weights_dir: ../data/weights/
+  save_base_weights_dir: ../data/weights/base/
   save_novel_weights_dir: ../data/weights/novel/
   save_training_info_dir: ../data/training_info/
 
@@ -52,9 +52,9 @@ paths:
   annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
   novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
   
-  train_base_annotations_path: ../data/base_dset/train.json   # The base train set
-  val_base_annotations_path  : ../data/base_dset/val.json     # The base validation set
-  test_base_annotations_path : ../data/base_dset/test.json    # The base test set
+  train_base_annotations_path: ../data/base_dset/small_base_train.json   # The base train set
+  val_base_annotations_path  : ../data/base_dset/small_base_val.json     # The base validation set
+  test_base_annotations_path : ../data/base_dset/small_base_test.json    # The base test set
   
   train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
   val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set

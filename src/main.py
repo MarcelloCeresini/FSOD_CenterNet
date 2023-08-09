@@ -14,7 +14,7 @@ from training import set_model_to_train_novel, train_loop_base
 
 def parse_args():
     arps = argparse.ArgumentParser()
-    arps.add_argument('-sett', '--settings', type='str', help='Settings YAML file')
+    arps.add_argument('-sett', '--settings', type=str, help='Settings YAML file')
     return arps.parse_args()
 
 
@@ -29,13 +29,10 @@ def main(args):
     debug_mode = conf['debug']['debug_mode_active']
     device = conf['device']
 
-    assert (not os.path.exists(conf['training']['save_weights_path'])), \
-        f"Weights path {conf['training']['save_weights_path']} already exists, will not overwrite, so delte it first or change the path."
-
     K = conf['data']['K']
     val_K = conf['data']['val_K']
     test_K = conf['data']['test_K']
-    n_repeats_novel_train = conf['data']['repeat_novel_training']
+    n_repeats_novel_train = conf['training']['repeat_novel_training']
 
     if isinstance(K, int):
         K = [K]
@@ -49,13 +46,13 @@ def main(args):
         annotations_path = conf['paths']['annotations_path'],
         images_dir = conf['paths']['images_dir'],
         novel_class_ids_path = conf['paths']['novel_classes_ids_path'],
-        train_set_path = conf['data']['train_annotations_path'],
-        val_set_path = conf['data']['val_annotations_path'],
-        test_set_path = conf['data']['test_annotations_path'],
-        use_fixed_sets = conf['data']['use_fixed_sets'],
-        novel_classes_list = conf['data']['novel_classes_list'],
-        novel_train_set_path = conf['data']['val_novel_annotations_path'],
-        novel_val_set_path = conf['paths']['train_novel_annotations_path'],
+        train_set_path = conf['paths']['train_base_annotations_path'],
+        val_set_path = conf['paths']['val_base_annotations_path'],
+        test_set_path = conf['paths']['test_base_annotations_path'],
+        use_fixed_novel_sets = conf['data']['use_fixed_sets'],
+        novel_train_set_path = conf['paths']['train_novel_annotations_path'],
+        novel_val_set_path = conf['paths']['val_novel_annotations_path'],
+        novel_test_set_path = conf['paths']['test_novel_annotations_path']
     )
 
     # Use the dataset generator to generate the base set
@@ -67,28 +64,30 @@ def main(args):
     # Instantiate the model
     model = Model(  encoder_name = conf['model']['encoder_name'], 
                     n_base_classes = len(dataset_gen.train_base.cats),
-                    n_novel_classes = len(dataset_gen.train_novel.cats),
+                    n_novel_classes = len(dataset_gen.novel_classes),
                     head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'],
                     head_novel_heatmap_mode = conf['model']['head_novel_heatmap_mode'])
     model = model.to(device)
 
     if debug_mode:
         print("Dataset base train length: ", len(dataset_base_train))
-        sample, landmarks, original_image_size = dataset_base_train[0]
+        # sample, landmarks, original_image_size = dataset_base_train[0]
         # use "show_images.py" functions to show the sample / samples
 
     optimizer_base = Adam(model.parameters(), lr=conf['training']['base']['lr'])
     
     # Train the base model
+    # TODO: IMAGES ARE MISSING!
     best_base_weights = train_loop_base(model,
         epochs=conf['training']['base']['epochs'],
-        training_loader=dataset_base_train,
-        validation_loader=dataset_base_val,
+        training_loader_base=dataset_base_train,
+        validation_loader_base=dataset_base_val,
         optimizer=optimizer_base,
-        weights_path=conf['training']['save_base_weights_path'],
-        name="standard_model_base")
+        weights_path=conf['training']['save_base_weights_dir'],
+        model_name="standard_model_base")
 
     # Evaluation on base test dataset
+    # TODO: fix
     metrics_base = Evaluate(model, dataset_base_test)
     
     with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
@@ -133,13 +132,7 @@ def main(args):
                 shuffle=True
             )
 
-        best_novel_weights_for_params = train_loop_base(model,
-            epochs=conf['training']['novel']['epochs'],
-            training_loader=dataset_novel_train,
-            validation_loader=dataset_novel_val,
-            optimizer=optimizer_novel,
-            weights_path=conf['training']['save_novel_weights_dir']
-            name=f"novel_model_K_{current_train_K}_{i // n_repeats_novel_train}")
+        # TODO: TRAINING
         
         # Evaluation on novel_dataset
         metrics_novel = Evaluate(model, dataset_novel_test)
