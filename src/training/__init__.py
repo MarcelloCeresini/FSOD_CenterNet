@@ -12,7 +12,7 @@ def set_model_to_train_novel(model, conf):
     Loads the correct weights and sets the model to train the novel head only
     '''
 
-    model.load_state_dict(T.load(conf.weights_path))
+    model.load_state_dict(T.load(conf['training']['save_base_weights_dir']))
 
     for module in model.named_children():
         if module[0] != "head_novel_heatmap":
