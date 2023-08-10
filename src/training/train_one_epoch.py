@@ -44,9 +44,8 @@ def train_one_epoch(model,
         loss.backward()
         optimizer.step()
 
-        # TODO: which one?
-        raise NotImplementedError("still havent decided which one to use")
         running_loss += loss.item()
-        running_loss += loss
 
-    return running_loss
+
+    avg_loss = running_loss / (i + 1)
+    return avg_loss

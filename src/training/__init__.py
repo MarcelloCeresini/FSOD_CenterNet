@@ -2,10 +2,16 @@ import torch as T
 import numpy as np
 from tqdm import tqdm
 
-import datetime
+from datetime import datetime
 
 from .train_one_epoch import train_one_epoch
 from .losses import heatmap_loss_batched, reg_loss_batched
+
+# CALLBACKS: 
+# - reduce learning rate on plateau
+# - early stopping
+# - save best model
+# - log to w&b
 
 def set_model_to_train_novel(model, conf):
     '''

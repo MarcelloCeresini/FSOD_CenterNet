@@ -26,6 +26,10 @@ def load_settings(settings_path: str):
 def main(args):
 
     conf = load_settings(args.settings)
+
+    if os.path.exists(conf['training']['save_base_weights_dir']) and conf["train_base"]:
+        raise ValueError("Cannot overwrite weights")
+
     debug_mode = conf['debug']['debug_mode_active']
     device = conf['device']
 
@@ -55,50 +59,55 @@ def main(args):
         novel_test_set_path = conf['paths']['test_novel_annotations_path']
     )
 
-    # Use the dataset generator to generate the base set
-    dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
-        conf['training']['batch_size'], conf['training']['num_workers'],
-        conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
-    )
-
-    # Instantiate the model
+# Instantiate the model
     model = Model(  encoder_name = conf['model']['encoder_name'], 
                     n_base_classes = len(dataset_gen.train_base.cats),
                     n_novel_classes = len(dataset_gen.novel_classes),
                     head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'],
                     head_novel_heatmap_mode = conf['model']['head_novel_heatmap_mode'])
+    
     model = model.to(device)
-
-    if debug_mode:
-        print("Dataset base train length: ", len(dataset_base_train))
-        # sample, landmarks, original_image_size = dataset_base_train[0]
-        # use "show_images.py" functions to show the sample / samples
-
-    optimizer_base = Adam(model.parameters(), 
-                          lr=conf['training']['base']['lr'])
     
-    # Train the base model
-    # TODO: IMAGES ARE MISSING!
-    model = train_loop(model,
-                       epochs=conf['training']['base']['epochs'],
-                       training_loader_base=dataset_base_train,
-                       validation_loader_base=dataset_base_val,
-                       optimizer=optimizer_base,
-                       model_name="standard_model_base")
+    if conf["train_base"]:
+    # Use the dataset generator to generate the base set
+        dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
+            conf['training']['batch_size'], conf['training']['num_workers'],
+            conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
+        )
 
-    with T.no_grad(): 
-        model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
-        model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
+    
+    
 
-    T.save(model.state_dict(), 
-           conf['training']['save_base_weights_dir'])
+        if debug_mode:
+            print("Dataset base train length: ", len(dataset_base_train))
+            # sample, landmarks, original_image_size = dataset_base_train[0]
+            # use "show_images.py" functions to show the sample / samples
+
+        optimizer_base = Adam(model.parameters(), 
+                            lr=conf['training']['base']['lr'])
     
-    # Evaluation on base test dataset
-    metrics_base = Evaluate(model, 
-                            dataset_base_test)
+        # Train the base model
+        # TODO: IMAGES ARE MISSING!
+        model = train_loop(model,
+                        epochs=conf['training']['base']['epochs'],
+                        training_loader_base=dataset_base_train,
+                        validation_loader_base=dataset_base_val,
+                        optimizer=optimizer_base,
+                        model_name="standard_model_base")
+
+        with T.no_grad(): 
+            model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
+            model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
+
+        T.save(model.state_dict(), 
+            conf['training']['save_base_weights_dir'])
+        
+        # Evaluation on base test dataset
+        metrics_base = Evaluate(model, 
+                                dataset_base_test)
     
-    with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
-        pickle.dump(metrics_base, f)
+        with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
+            pickle.dump(metrics_base, f)
 
     ## NOVEL TRAININGS ##
 
