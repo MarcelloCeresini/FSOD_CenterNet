@@ -8,11 +8,10 @@ from data_pipeline.transform import anti_transform_testing_after_model
 class Evaluate:
     '''
     Takes as input a model and a dataset WITHOUT TRANSFORMATIONS and evaluates the model
-    
+        
     Returns:
     
     - ``map_dict``: A dictionary containing the following key-values:
-
         - map: (:class:`~torch.Tensor`), global mean average precision
         - map_small: (:class:`~torch.Tensor`), mean average precision for small objects
         - map_medium:(:class:`~torch.Tensor`), mean average precision for medium objects
@@ -37,9 +36,10 @@ class Evaluate:
                  model, 
                  dataset):
         
-        self.model = model
+        self.model   = model
         self.dataset = dataset
-        self.stride = self.dataset.transform.conf.output_stride
+        # TODO: not clear what you're trying to get here but dataloader has no attibute transform
+        self.stride  = self.dataset.transform.conf.output_stride
 
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 

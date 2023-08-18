@@ -1,5 +1,5 @@
+import os
 import torch as T
-import numpy as np
 from tqdm import tqdm
 
 from datetime import datetime
@@ -32,6 +32,7 @@ def train_loop(model,
                training_loader,
                validation_loader,
                optimizer,
+               weights_path=None,
                name="standard_model",
                novel_training=False):
 
@@ -43,7 +44,7 @@ def train_loop(model,
     else:
         print("Training base started")
 
-    best_vloss = np.inf
+    best_vloss = 1e10
 
     for epoch in range(epochs):
         print('EPOCH {}:'.format(epoch + 1))
@@ -105,8 +106,7 @@ def train_loop(model,
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
 
-            model_path = '{}_{}_{}'.format(name, timestamp, epoch)
-            
+            model_path = os.path.join(weights_path, '{}_{}_{}.pt'.format(name, timestamp, epoch))
             if not novel_training:
                 T.save(model.state_dict(), model_path)
 

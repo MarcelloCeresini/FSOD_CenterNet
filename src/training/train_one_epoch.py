@@ -1,7 +1,7 @@
 import torch as T
 from tqdm import tqdm
 
-from losses import heatmap_loss_batched, reg_loss_batched
+from .losses import heatmap_loss_batched, reg_loss_batched
 
 def train_one_epoch(model,
                     training_loader,

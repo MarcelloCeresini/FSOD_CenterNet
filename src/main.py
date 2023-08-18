@@ -1,10 +1,10 @@
-import torch as T
-import yaml
-from torch.optim import Adam
-
 import argparse
 import os
 import pickle
+
+import torch as T
+import yaml
+from torch.optim import Adam
 
 from data_pipeline import DatasetsGenerator
 from evaluation import Evaluate
@@ -59,7 +59,7 @@ def main(args):
         novel_test_set_path = conf['paths']['test_novel_annotations_path']
     )
 
-# Instantiate the model
+    # Instantiate the model
     model = Model(  encoder_name = conf['model']['encoder_name'], 
                     n_base_classes = len(dataset_gen.train_base.cats),
                     n_novel_classes = len(dataset_gen.novel_classes),
@@ -68,15 +68,12 @@ def main(args):
     
     model = model.to(device)
     
-    if conf["train_base"]:
-    # Use the dataset generator to generate the base set
+    if conf['training']['train_base']:
+        # Use the dataset generator to generate the base set
         dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
             conf['training']['batch_size'], conf['training']['num_workers'],
             conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
         )
-
-    
-    
 
         if debug_mode:
             print("Dataset base train length: ", len(dataset_base_train))
@@ -87,13 +84,13 @@ def main(args):
                             lr=conf['training']['base']['lr'])
     
         # Train the base model
-        # TODO: IMAGES ARE MISSING!
         model = train_loop(model,
                         epochs=conf['training']['base']['epochs'],
-                        training_loader_base=dataset_base_train,
-                        validation_loader_base=dataset_base_val,
+                        training_loader=dataset_base_train,
+                        validation_loader=dataset_base_val,
                         optimizer=optimizer_base,
-                        model_name="standard_model_base")
+                        weights_path=conf['training']['save_base_weights_dir'],
+                        name="standard_model_base")
 
         with T.no_grad(): 
             model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
@@ -113,7 +110,7 @@ def main(args):
 
     # Train and eval novel
     metrics_novel_list = {k: [] for k in conf['data']['K']}
-    metrics_full_list = {k: [] for k in conf['data']['K']}
+    metrics_full_list  = {k: [] for k in conf['data']['K']}
 
     total_trainings = len(K) * n_repeats_novel_train
     for i in range(total_trainings):
@@ -145,10 +142,11 @@ def main(args):
             )
 
         model = train_loop(model,
-                           epochs=conf.epochs_novel,
+                           epochs=conf['training']['novel']['epochs'],
                            training_loader=dataset_novel_train,
                            validation_loader=dataset_novel_val,
                            optimizer=optimizer_novel,
+                           weights_path=conf['training']['save_novel_weights_dir'],
                            novel_training=True)
         
         # Evaluation on novel_dataset

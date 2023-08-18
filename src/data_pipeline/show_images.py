@@ -5,13 +5,17 @@ from torchvision.utils import draw_bounding_boxes
 import torch as T
 from PIL.Image import blend
 
+from pycocotools.coco import COCO
+
 from . import DatasetFromCocoAnnotations
 from transform import TransformTraining
 from dataset_config import DatasetConfig
 
-dataset = DatasetFromCocoAnnotations(annotations_path="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/annotations/fsod_train_short.json",
-                                     images_dir="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/images",
-                                     transform=TransformTraining())
+# TODO not working
+# dataset = DatasetFromCocoAnnotations(
+#     coco=COCO("/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/annotations/fsod_train_short.json"),
+#     images_dir="/Users/marcelloceresini/github/FSOD_CenterNet/data/fsod/images",
+#     transform=TransformTraining())
 
 img_list = []
 annotation_list = []
