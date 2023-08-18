@@ -17,7 +17,5 @@ class DatasetConfig:
         self.sgb_lims = (0.01, 2.0)
 
         self.min_IoU_for_gaussian_radius = 0.7
-        self.n_base_classes = 1000 # TODO: insert real number
-        self.n_novel_classes = 10 # TODO: insert real number
 
         

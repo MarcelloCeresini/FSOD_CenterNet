@@ -9,6 +9,7 @@ training:
   num_workers: 1
   pin_memory: True
   drop_last: False
+  train_base: True
   base:
     lr: 0.001
     epochs: 100

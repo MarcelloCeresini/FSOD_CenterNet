@@ -9,7 +9,9 @@ from .landmarks_to_labels import LandmarksToLabels
 
 class TransformTraining:
     def __init__(self,
-                 conf: DatasetConfig = DatasetConfig()) -> None:
+                 conf: DatasetConfig = DatasetConfig(),
+                 num_base_classes: int = 0,
+                 num_novel_classes: int = 0) -> None:
         
         self.random_crop = RandomResizedCropOwn(size=conf.input_to_model_resolution,
                                                 scale=conf.crop_scale, # scale of the crop (before resizing) compared to original image
@@ -32,7 +34,7 @@ class TransformTraining:
         
         self.normalize = NormalizeOwn()
 
-        self.landmarks_to_labels = LandmarksToLabels(conf)
+        self.landmarks_to_labels = LandmarksToLabels(conf, num_base_classes, num_novel_classes)
 
 
     def __call__(self, 
@@ -60,13 +62,15 @@ class TransformTraining:
 
 class TransformTesting:
     def __init__(self,
-                 conf: DatasetConfig = DatasetConfig()) -> None:
+                 conf: DatasetConfig = DatasetConfig(),
+                 num_base_classes: int = 0,
+                 num_novel_classes: int = 0) -> None:
         
         self.resize = ResizeOwn(size=conf.input_to_model_resolution) # aspect ratio of the crop (before resizing) compared to original image
         
         self.normalize = NormalizeOwn()
 
-        self.landmarks_to_labels = LandmarksToLabels(conf)
+        self.landmarks_to_labels = LandmarksToLabels(conf, num_base_classes, num_novel_classes)
 
 
     def __call__(self, 

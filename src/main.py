@@ -9,7 +9,7 @@ from torch.optim import Adam
 from data_pipeline import DatasetsGenerator
 from evaluation import Evaluate
 from model import Model
-from training import set_model_to_train_novel, train_loop_base
+from training import set_model_to_train_novel, train_loop
 
 
 def parse_args():
@@ -26,6 +26,10 @@ def load_settings(settings_path: str):
 def main(args):
 
     conf = load_settings(args.settings)
+
+    if os.path.exists(conf['training']['save_base_weights_dir']) and conf["train_base"]:
+        raise ValueError("Cannot overwrite weights")
+
     debug_mode = conf['debug']['debug_mode_active']
     device = conf['device']
 
@@ -55,48 +59,59 @@ def main(args):
         novel_test_set_path = conf['paths']['test_novel_annotations_path']
     )
 
-    # Use the dataset generator to generate the base set
-    dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
-        conf['training']['batch_size'], conf['training']['num_workers'],
-        conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
-    )
-
     # Instantiate the model
     model = Model(  encoder_name = conf['model']['encoder_name'], 
                     n_base_classes = len(dataset_gen.train_base.cats),
                     n_novel_classes = len(dataset_gen.novel_classes),
                     head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'],
                     head_novel_heatmap_mode = conf['model']['head_novel_heatmap_mode'])
+    
     model = model.to(device)
-
-    if debug_mode:
-        print("Dataset base train length: ", len(dataset_base_train))
-        # sample, landmarks, original_image_size = dataset_base_train[0]
-        # use "show_images.py" functions to show the sample / samples
-
-    optimizer_base = Adam(model.parameters(), lr=conf['training']['base']['lr'])
     
-    # Train the base model
-    # TODO: IMAGES ARE MISSING!
-    best_base_weights = train_loop_base(model,
-        epochs=conf['training']['base']['epochs'],
-        training_loader_base=dataset_base_train,
-        validation_loader_base=dataset_base_val,
-        optimizer=optimizer_base,
-        weights_path=conf['training']['save_base_weights_dir'],
-        model_name="standard_model_base")
+    if conf['training']['train_base']:
+        # Use the dataset generator to generate the base set
+        dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
+            conf['training']['batch_size'], conf['training']['num_workers'],
+            conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
+        )
 
-    # Evaluation on base test dataset
-    # TODO: fix
-    metrics_base = Evaluate(model, dataset_base_test)
+        if debug_mode:
+            print("Dataset base train length: ", len(dataset_base_train))
+            # sample, landmarks, original_image_size = dataset_base_train[0]
+            # use "show_images.py" functions to show the sample / samples
+
+        optimizer_base = Adam(model.parameters(), 
+                            lr=conf['training']['base']['lr'])
     
-    with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
-        pickle.dump(metrics_base, f)
+        # Train the base model
+        model = train_loop(model,
+                        epochs=conf['training']['base']['epochs'],
+                        training_loader=dataset_base_train,
+                        validation_loader=dataset_base_val,
+                        optimizer=optimizer_base,
+                        weights_path=conf['training']['save_base_weights_dir'],
+                        name="standard_model_base")
+
+        with T.no_grad(): 
+            model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
+            model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
+
+        T.save(model.state_dict(), 
+            conf['training']['save_base_weights_dir'])
+        
+        # Evaluation on base test dataset
+        metrics_base = Evaluate(model, 
+                                dataset_base_test)
+    
+        with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
+            pickle.dump(metrics_base, f)
 
     ## NOVEL TRAININGS ##
 
     # Train and eval novel
-    metrics_novel_list = []
+    metrics_novel_list = {k: [] for k in conf['data']['K']}
+    metrics_full_list  = {k: [] for k in conf['data']['K']}
+
     total_trainings = len(K) * n_repeats_novel_train
     for i in range(total_trainings):
         print(f"\nTraining on novel dataset n°{i} out of {total_trainings}")
@@ -105,17 +120,11 @@ def main(args):
         current_val_K   = val_K[i % n_repeats_novel_train]
         current_test_K  = test_K[i % n_repeats_novel_train]
 
-        # Load weights from base model
-        model.load_state_dict(T.load(best_base_weights))
-        # Copy the weights of the first convolution from the first conv from the base head to the novel head
-        with T.no_grad(): 
-            model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
-            model.head_novel_heatmap.conv1.bias.data   = model.head_base_heatmap.conv1.bias.data
-        # Freeze the weights of everything except the novel head
-        model = set_model_to_train_novel(model)
+        model = set_model_to_train_novel(model, conf)
 
         # Optimizer
-        optimizer_novel = Adam(model.parameters(), lr=conf['training']['novel']['lr'])
+        optimizer_novel = Adam(model.parameters(), 
+                               lr=conf['training']['novel']['lr'])
 
         # Obtain dataset from generator
         # Use the dataset generator to generate the base set
@@ -132,38 +141,29 @@ def main(args):
                 shuffle=True
             )
 
-        # TODO: TRAINING
+        model = train_loop(model,
+                           epochs=conf['training']['novel']['epochs'],
+                           training_loader=dataset_novel_train,
+                           validation_loader=dataset_novel_val,
+                           optimizer=optimizer_novel,
+                           weights_path=conf['training']['save_novel_weights_dir'],
+                           novel_training=True)
         
         # Evaluation on novel_dataset
         metrics_novel = Evaluate(model, dataset_novel_test)
-        metrics_novel_list.append(metrics_novel)
+        metrics_novel_list[current_train_K].append(metrics_novel)
+
+        # TODO: merge the two datasets
+        # Evaluation on full dataset
+        metrics_full = Evaluate(model, dataset_full_test)
+        metrics_full_list[current_train_K].append(metrics_full)
     
     with open(os.path.join(conf['training']['save_training_info_dir'], 'novel_training_info.pkl'), 'wb') as f:
         pickle.dump(metrics_novel_list, f)
     
-    '''
-    - ``map_dict``: A dictionary containing the following key-values:
-
-        - map: (:class:`~torch.Tensor`), global mean average precision
-        - map_small: (:class:`~torch.Tensor`), mean average precision for small objects
-        - map_medium:(:class:`~torch.Tensor`), mean average precision for medium objects
-        - map_large: (:class:`~torch.Tensor`), mean average precision for large objects
-        - mar_1: (:class:`~torch.Tensor`), mean average recall for 1 detection per image
-        - mar_10: (:class:`~torch.Tensor`), mean average recall for 10 detections per image
-        - mar_100: (:class:`~torch.Tensor`), mean average recall for 100 detections per image
-        - mar_small: (:class:`~torch.Tensor`), mean average recall for small objects
-        - mar_medium: (:class:`~torch.Tensor`), mean average recall for medium objects
-        - mar_large: (:class:`~torch.Tensor`), mean average recall for large objects
-        - map_50: (:class:`~torch.Tensor`) (-1 if 0.5 not in the list of iou thresholds), mean average precision at
-          IoU=0.50
-        - map_75: (:class:`~torch.Tensor`) (-1 if 0.75 not in the list of iou thresholds), mean average precision at
-          IoU=0.75
-        - map_per_class: (:class:`~torch.Tensor`) (-1 if class metrics are disabled), mean average precision per
-          observed class
-        - mar_100_per_class: (:class:`~torch.Tensor`) (-1 if class metrics are disabled), mean average recall for 100
-          detections per image per observed class
-        - classes (:class:`~torch.Tensor`), list of all observed classes
-    '''
+    with open(os.path.join(conf['training']['save_training_info_dir'], 'full_training_info.pkl'), 'wb') as f:
+        pickle.dump(metrics_full_list, f)
+    
 
 if __name__ == "__main__":
     args = parse_args()

@@ -2,12 +2,11 @@ import json
 import os
 import random
 import time
-from typing import Any, Dict, Iterator, List, Optional, Sized
+from typing import Dict, List
 from tempfile import TemporaryFile
 
 from tqdm import tqdm
 
-import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 
@@ -106,7 +105,6 @@ class DatasetsGenerator():
 
         self.novel_class_ids_path   = novel_class_ids_path
 
-
         # Check if we should select a new split of the set or use the given ones
         if self.use_fixed_novel_sets:
             assert self.novel_train_set_path is not None, 'Novel train set path must not be None in fixed set mode'
@@ -204,9 +202,18 @@ class DatasetsGenerator():
 
     def get_base_sets(self):
         return (
-            DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining()),
-            DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining()),
-            DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting())
+            DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
+                num_base_classes=len(self.train_base.cats),
+                num_novel_classes=len(self.train_novel.cats) if hasattr(self, 'train_novel') else 0
+            )),
+            DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining(
+                num_base_classes=len(self.val_base.cats),
+                num_novel_classes=len(self.val_novel.cats) if hasattr(self, 'val_novel') else 0
+            )),
+            DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting(
+                num_base_classes=len(self.test_base.cats),
+                num_novel_classes=len(self.test_novel.cats) if hasattr(self, 'test_novel') else 0
+            ))
         )
     
     def get_base_sets_dataloaders(self, batch_size = None, num_workers = 1, pin_memory = True,
@@ -232,10 +239,19 @@ class DatasetsGenerator():
         self._generate_new_novel_sets(K, val_K, test_K, num_novel_classes_to_sample, 
                                       novel_classes_to_sample_list, random_seed)
         return self.get_base_sets(), (
-                DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining()),
-                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining()),
-                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting())
-            )
+                DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining(
+                num_base_classes=len(self.train_base.cats),
+                num_novel_classes=len(self.train_novel.cats) if hasattr(self, 'train_novel') else novel_classes_to_sample_list
+            )),
+                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining(
+                num_base_classes=len(self.val_base.cats),
+                num_novel_classes=len(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
+            )),
+                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting(
+                num_base_classes=len(self.test_base.cats),
+                num_novel_classes=len(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
+            ))
+        )
     
 
     def generate_dataloaders(self, 

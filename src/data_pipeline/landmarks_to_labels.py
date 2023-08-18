@@ -5,13 +5,15 @@ from .dataset_config import DatasetConfig
 
 class LandmarksToLabels:
     def __init__(self,
-                 conf: DatasetConfig) -> None:
+                 conf: DatasetConfig,
+                 num_base_classes: int,
+                 num_novel_classes: int) -> None:
         
         # model outputs (out_reg, out_heat_base, out_heat_novel)
         self.output_resolution = conf.output_resolution
         self.regressor_label_size = [4, *self.output_resolution]
-        self.heatmap_base_size = [conf.n_base_classes, *self.output_resolution]
-        self.heatmap_novel_size = [conf.n_novel_classes, *self.output_resolution]
+        self.heatmap_base_size = [num_base_classes, *self.output_resolution]
+        self.heatmap_novel_size = [num_novel_classes, *self.output_resolution]
 
         self.output_stride = conf.output_stride
         self.min_IoU_for_gaussian_radius = conf.min_IoU_for_gaussian_radius
@@ -106,6 +108,7 @@ class LandmarksToLabels:
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
             regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
+            # TODO: DO THESE ACTUALLY WORK AS INTENDED? ARE CATEGORIES CONTIGUOUS LIKE THAT?
             if (cat := l["category_id"]) < (n_bc := self.heatmap_base_size[0]):
                 heatmap_base[cat, ...] = self.draw_gaussian(heatmap_base[cat, ...],
                                                             [*lr_cp_idx, *l["size"]])

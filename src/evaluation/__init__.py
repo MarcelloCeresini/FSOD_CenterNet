@@ -8,9 +8,30 @@ from data_pipeline.transform import anti_transform_testing_after_model
 class Evaluate:
     '''
     Takes as input a model and a dataset WITHOUT TRANSFORMATIONS and evaluates the model
-    Oss: we don't need the labels in tensor form to compute the metrics
+        
+    Returns:
+    
+    - ``map_dict``: A dictionary containing the following key-values:
+        - map: (:class:`~torch.Tensor`), global mean average precision
+        - map_small: (:class:`~torch.Tensor`), mean average precision for small objects
+        - map_medium:(:class:`~torch.Tensor`), mean average precision for medium objects
+        - map_large: (:class:`~torch.Tensor`), mean average precision for large objects
+        - mar_1: (:class:`~torch.Tensor`), mean average recall for 1 detection per image
+        - mar_10: (:class:`~torch.Tensor`), mean average recall for 10 detections per image
+        - mar_100: (:class:`~torch.Tensor`), mean average recall for 100 detections per image
+        - mar_small: (:class:`~torch.Tensor`), mean average recall for small objects
+        - mar_medium: (:class:`~torch.Tensor`), mean average recall for medium objects
+        - mar_large: (:class:`~torch.Tensor`), mean average recall for large objects
+        - map_50: (:class:`~torch.Tensor`) (-1 if 0.5 not in the list of iou thresholds), mean average precision at
+            IoU=0.50
+        - map_75: (:class:`~torch.Tensor`) (-1 if 0.75 not in the list of iou thresholds), mean average precision at
+            IoU=0.75
+        - map_per_class: (:class:`~torch.Tensor`) (-1 if class metrics are disabled), mean average precision per
+            observed class
+        - mar_100_per_class: (:class:`~torch.Tensor`) (-1 if class metrics are disabled), mean average recall for 100
+            detections per image per observed class
+        - classes (:class:`~torch.Tensor`), list of all observed classes
     '''
-
     def __init__(self,
                  model, 
                  dataset):
