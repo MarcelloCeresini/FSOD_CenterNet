@@ -7,7 +7,7 @@ class Config:
         self.head_regressor_latent_dim = 64 # output dimension of the first 3x3 convolution in the regressor head
         self.head_heatmap_latent_dim = 64 # output dimension of the first 3x3 convolution in the heatmap head
         
-        self.range_extender_cos_head = 10.0
+        self.range_extender_cos_head = 10.0 # Fixed to 10. by the paper
 
         self.alpha_loss = 0.9 # TODO: should be hyperparameter of focal loss
         self.beta_loss = 0.9 # TODO: should be hyperparameter of focal loss
