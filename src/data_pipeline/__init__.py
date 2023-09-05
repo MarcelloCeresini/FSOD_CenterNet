@@ -66,8 +66,7 @@ class DatasetFromCocoAnnotations(Dataset):
                   "landmarks": annotations_for_image}
 
         if isinstance(self.transform, (TransformTraining, TransformTesting)):
-            sample, transformed_landmarks, original_sample = self.transform(sample)
-            return sample, transformed_landmarks, original_sample
+            return self.transform(sample)       # sample, transformed_landmarks, original_sample
         else:
             return sample
 
@@ -201,18 +200,19 @@ class DatasetsGenerator():
 
 
     def get_base_sets(self):
+        # TODO: validation should have TransformTraining or TransformTesting?
         return (
             DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
-                num_base_classes=len(self.train_base.cats),
-                num_novel_classes=len(self.train_novel.cats) if hasattr(self, 'train_novel') else 0
+                base_classes=list(self.train_base.cats),
+                novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else []
             )),
             DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining(
-                num_base_classes=len(self.val_base.cats),
-                num_novel_classes=len(self.val_novel.cats) if hasattr(self, 'val_novel') else 0
+                base_classes=list(self.val_base.cats),
+                novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else []
             )),
             DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting(
-                num_base_classes=len(self.test_base.cats),
-                num_novel_classes=len(self.test_novel.cats) if hasattr(self, 'test_novel') else 0
+                base_classes=list(self.test_base.cats),
+                novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else []
             ))
         )
     
@@ -240,16 +240,16 @@ class DatasetsGenerator():
                                       novel_classes_to_sample_list, random_seed)
         return self.get_base_sets(), (
                 DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining(
-                num_base_classes=len(self.train_base.cats),
-                num_novel_classes=len(self.train_novel.cats) if hasattr(self, 'train_novel') else novel_classes_to_sample_list
+                base_classes=list(self.train_base.cats),
+                novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else novel_classes_to_sample_list
             )),
                 DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining(
-                num_base_classes=len(self.val_base.cats),
-                num_novel_classes=len(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
+                base_classes=list(self.val_base.cats),
+                novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
             )),
                 DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting(
-                num_base_classes=len(self.test_base.cats),
-                num_novel_classes=len(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
+                base_classes=list(self.test_base.cats),
+                novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
             ))
         )
     

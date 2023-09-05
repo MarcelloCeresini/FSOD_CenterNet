@@ -1,21 +1,28 @@
-import torch as T
+import math
+from typing import List
+
 import numpy as np
+import torch as T
 
 from .dataset_config import DatasetConfig
+
 
 class LandmarksToLabels:
     def __init__(self,
                  conf: DatasetConfig,
-                 num_base_classes: int,
-                 num_novel_classes: int) -> None:
+                 base_class_list: List,
+                 novel_class_list: List) -> None:
         
-        # model outputs (out_reg, out_heat_base, out_heat_novel)
-        self.output_resolution = conf.output_resolution
-        self.regressor_label_size = [4, *self.output_resolution]
-        self.heatmap_base_size = [num_base_classes, *self.output_resolution]
-        self.heatmap_novel_size = [num_novel_classes, *self.output_resolution]
+        self.base_classes           = base_class_list
+        self.novel_classes          = novel_class_list
 
-        self.output_stride = conf.output_stride
+        # model outputs (out_reg, out_heat_base, out_heat_novel)
+        self.output_resolution      = conf.output_resolution
+        self.regressor_label_size   = [4, *self.output_resolution]
+        self.heatmap_base_size      = [len(self.base_classes), *self.output_resolution]
+        self.heatmap_novel_size     = [len(self.novel_classes), *self.output_resolution]
+
+        self.output_stride          = conf.output_stride
         self.min_IoU_for_gaussian_radius = conf.min_IoU_for_gaussian_radius
 
     def gaussian_radius(self, det_size, min_overlap):
@@ -90,29 +97,34 @@ class LandmarksToLabels:
                  landmarks) -> tuple():
         
         regressor_label = T.zeros(self.regressor_label_size)
-        heatmap_base = T.zeros(self.heatmap_base_size)
-        heatmap_novel = T.zeros(self.heatmap_novel_size)
+        heatmap_base    = T.zeros(self.heatmap_base_size)
+        heatmap_novel   = T.zeros(self.heatmap_novel_size)
 
         for l in landmarks:
-            low_res_cp = [l["center_point"][0] / self.output_stride[0],
-                          l["center_point"][1] / self.output_stride[1]]
-            
-            lr_cp_idx = [int(np.floor(low_res_cp[0])),
-                         int(np.floor(low_res_cp[1]))]
-            
-            offset = [int(low_res_cp[0] - lr_cp_idx[0]),
-                      int(low_res_cp[1] - lr_cp_idx[1])]
+            low_res_cp = [l["center_point"][i] / self.output_stride[i] 
+                          for i in range(len(l["center_point"]))]
 
+            lr_cp_idx = [math.floor(low_res_cp[i]) 
+                         for i in range(len(low_res_cp))]
+
+            # TODO: it was int, but I think it should be float?? Otherwise it's always 0
+            offset = [low_res_cp[i] - lr_cp_idx[i]
+                      for i in range(len(low_res_cp))]
+
+            # TODO: is "size" this large? shouldn't it be normalized?
             regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0]
             regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1]
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
             regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
-            # TODO: DO THESE ACTUALLY WORK AS INTENDED? ARE CATEGORIES CONTIGUOUS LIKE THAT?
-            if (cat := l["category_id"]) < (n_bc := self.heatmap_base_size[0]):
-                heatmap_base[cat, ...] = self.draw_gaussian(heatmap_base[cat, ...],
-                                                            [*lr_cp_idx, *l["size"]])
+            cat = l["category_id"]
+            if cat in self.novel_classes:
+                cat_idx = self.novel_classes.index(cat)
+                heatmap_novel[cat_idx, ...] = self.draw_gaussian(heatmap_novel[cat_idx, ...], 
+                                                                 [*lr_cp_idx, *l["size"]])
             else:
-                heatmap_novel[cat, ...] = self.draw_gaussian(heatmap_novel[cat-n_bc, ...],
-                                                             [*lr_cp_idx, *l["size"]])
+                cat_idx = self.base_classes.index(cat)
+                heatmap_base[cat_idx, ...] = self.draw_gaussian(heatmap_base[cat_idx, ...], 
+                                                                [*lr_cp_idx, *l["size"]])
+
         return regressor_label, heatmap_base, heatmap_novel
