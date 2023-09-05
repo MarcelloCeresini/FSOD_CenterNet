@@ -11,5 +11,7 @@ class Config:
 
         self.alpha_loss = 0.9 # TODO: should be hyperparameter of focal loss
         self.beta_loss = 0.9 # TODO: should be hyperparameter of focal loss
+        self.lambda_size_loss = 0.9 # TODO: is it ok?
+        self.lambda_offset_loss = 0.9 # TODO: is it ok?
 
         
