@@ -60,7 +60,7 @@ class DatasetFromCocoAnnotations(Dataset):
                     a["bbox"][3])
             a['center_point'] = center_point
             a['size'] = size
-            del a['iscrowd'] # pointless to keep it
+            if 'iscrowd' in a: del a['iscrowd'] # Pointless to keep it
 
         sample = {'image': image, 
                   "landmarks": annotations_for_image}
@@ -120,7 +120,6 @@ class DatasetsGenerator():
 
 
     def setup(self):
-
         # Open the full annotations file
         with open(self.annotations_path, 'r') as f:
             self.full_annotations = json.load(f)
@@ -130,6 +129,7 @@ class DatasetsGenerator():
         # Load the IDs of the pre-selected novel classes
         with open(self.novel_class_ids_path, 'r') as f:
             self.novel_classes = json.load(f)['novel_cat_ids']
+
 
     def _sample_novel_set(self, 
                           sampleable_novel_classes: List[int], 

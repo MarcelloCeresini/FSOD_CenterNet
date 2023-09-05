@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "cwd": "${workspaceFolder}/src",
-            "program": "main.py",
+            "program": "train.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["-sett", "settings/model_testing.yaml"]
