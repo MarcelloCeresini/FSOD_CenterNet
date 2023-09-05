@@ -5,17 +5,19 @@ model:
   head_novel_heatmap_mode: AdaptiveCosHead
 
 training:
-  batch_size: 64
-  num_workers: 1
-  pin_memory: True
-  drop_last: False
   train_base: True
+  train_novel: True
   base:
     lr: 0.001
     epochs: 100
   novel:
     lr: 0.0001
     epochs: 50
+
+  batch_size: 4
+  num_workers: 1
+  pin_memory: True
+  drop_last: False
   repeat_novel_training: 1
   save_base_weights_dir: ../data/weights/base/
   save_novel_weights_dir: ../data/weights/novel/
@@ -30,7 +32,7 @@ data:
                                         # If both are none, all novel classes will be used. 
                                         # Otherwise, the number of novel classes to sample.
 
-  novel_classes_list: null              # If novel_classes is null, this should be a list of 
+  novel_classes_list: null              # If novel_classes_to_sample is null, this should be a list of 
                                         # novel classes that we want to use. If both are null,
                                         # all novel classes are used
 
@@ -64,4 +66,4 @@ paths:
 debug:
   debug_mode_active: True
 
-device: cpu       # "cpu" or "cuda"
+device: cuda       # "cpu" or "cuda"

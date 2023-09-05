@@ -1,9 +1,9 @@
 import os
+from typing import Dict
 import torch as T
 from tqdm import tqdm
 
-from datetime import datetime
-
+from model import Model
 from .train_one_epoch import train_one_epoch
 from .losses import heatmap_loss_batched, reg_loss_batched
 
@@ -13,13 +13,22 @@ from .losses import heatmap_loss_batched, reg_loss_batched
 # - save best model
 # - log to w&b
 
-def set_model_to_train_novel(model, conf):
+def set_model_to_train_novel(model: Model, conf: Dict):
     '''
     Loads the correct weights and sets the model to train the novel head only
     '''
+    # Load the weights from the base training
+    model.load_state_dict(
+        T.load(conf['training']['save_base_weights_dir'] + 'best_base.pt', map_location='cpu'),
+        strict=False
+    )
 
-    model.load_state_dict(T.load(conf['training']['save_base_weights_dir']))
+    # Add the base head weights to the novel head
+    with T.no_grad(): 
+        model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
+        model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
 
+    # Finally, stop training for base model (only novel model shall be learned)
     for module in model.named_children():
         if module[0] != "head_novel_heatmap":
             module[1].requires_grad_(False)
@@ -35,33 +44,27 @@ def train_loop(model,
                weights_path=None,
                name="standard_model",
                novel_training=False):
-
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    # writer = SummaryWriter('runs/fashion_trainer_{}'.format(timestamp))
     
-    if novel_training:
-        print("Training novel started")
-    else:
-        print("Training base started")
+    print("####################")
+    print(f"Started {'base' if not novel_training else 'novel'} training")
+    print("####################")
 
     best_vloss = 1e10
 
     for epoch in range(epochs):
         print('EPOCH {}:'.format(epoch + 1))
 
-        # train one epoch
-        # TODO: check if model.train() unfreezes the layers during novel training
-
+        # Train for one epoch
         model.train()
         avg_loss = train_one_epoch(model,
                                    training_loader,
                                    optimizer,
                                    novel_training=novel_training)
 
-        # validate
+        # Validate
         running_vloss = 0.0
+        
         model.eval()
-
         with T.no_grad():
             for i, (sample, transformed_landmarks, _) in tqdm(enumerate(validation_loader), total=len(validation_loader)):
                 
@@ -95,19 +98,14 @@ def train_loop(model,
 
         print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
 
-        # Log the running loss averaged per batch
-        # for both training and validation
-        # writer.add_scalars('Training vs. Validation Loss',
-        #                 { 'Training' : avg_loss, 'Validation' : avg_vloss },
-        #                 epoch_number + 1)
-        # writer.flush()
+        # TODO: Log the running loss averaged per batch for both training and validation
 
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
 
-            model_path = os.path.join(weights_path, '{}_{}_{}.pt'.format(name, timestamp, epoch))
             if not novel_training:
+                model_path = os.path.join(weights_path, 'best_base.pt')
                 T.save(model.state_dict(), model_path)
 
     return model
