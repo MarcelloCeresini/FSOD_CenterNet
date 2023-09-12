@@ -84,6 +84,7 @@ def main(args):
                         training_loader=dataset_base_train,
                         validation_loader=dataset_base_val,
                         optimizer=optimizer_base,
+                        device=device,
                         weights_path=conf['training']['save_base_weights_dir'],
                         name="standard_model_base")
         

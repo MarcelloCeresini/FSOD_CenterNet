@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from model import Model
 from .train_one_epoch import train_one_epoch
-from .losses import heatmap_loss_batched, reg_loss_batched
+from .losses import heatmap_loss, reg_loss
 
 # CALLBACKS: 
 # - reduce learning rate on plateau
@@ -41,6 +41,7 @@ def train_loop(model,
                training_loader,
                validation_loader,
                optimizer,
+               device,
                weights_path=None,
                name="standard_model",
                novel_training=False):
@@ -59,6 +60,7 @@ def train_loop(model,
         avg_loss = train_one_epoch(model,
                                    training_loader,
                                    optimizer,
+                                   device,
                                    novel_training=novel_training)
 
         # Validate
@@ -76,18 +78,18 @@ def train_loop(model,
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image)
 
                 if novel_training:
-                    vloss = T.mean(heatmap_loss_batched(pred_heat_novel,
+                    vloss = T.mean(heatmap_loss(pred_heat_novel,
                                                         gt_heat_novel,
                                                         n_detections),
                                    dim=0)
                 
                 else:
-                    vloss = T.mean(heatmap_loss_batched(pred_heat_base,
+                    vloss = T.mean(heatmap_loss(pred_heat_base,
                                                         gt_heat_base,
                                                         n_detections),
                                 dim=0)
             
-                    vloss += T.mean(reg_loss_batched(pred_reg,
+                    vloss += T.mean(reg_loss(pred_reg,
                                                     gt_reg,
                                                     n_detections),
                                     dim=0)

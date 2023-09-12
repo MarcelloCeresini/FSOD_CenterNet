@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import torch as T
 from torchvision.transforms import ColorJitter, Compose, GaussianBlur
 
@@ -35,7 +35,7 @@ class TransformTraining:
         self.normalize = NormalizeOwn()
 
         self.landmarks_to_labels = LandmarksToLabels(conf, base_classes, novel_classes)
-
+ 
 
     def __call__(self, 
                  original_sample):
@@ -57,7 +57,7 @@ class TransformTraining:
         
         labels = self.landmarks_to_labels(landmarks)
 
-        return (image, labels), landmarks, original_sample
+        return (image, labels, len(landmarks)) #, landmarks , original_sample
         
 
 class TransformTesting:
