@@ -2,8 +2,7 @@ import torch as T
 import torch.nn.functional as NNF
 import torchvision.transforms.functional as TF
 from torchmetrics.detection import MeanAveragePrecision
-
-from data_pipeline.transform import anti_transform_testing_after_model
+from tqdm import tqdm
 
 class Evaluate:
     '''
@@ -34,12 +33,14 @@ class Evaluate:
     '''
     def __init__(self,
                  model, 
-                 dataset):
+                 dataset,
+                 prefix=""):
         
         self.model   = model
         self.dataset = dataset
+        self.prefix  = prefix
         # TODO: not clear what you're trying to get here but dataloader has no attibute transform
-        self.stride  = self.dataset.transform.conf.output_stride
+        # self.stride  = self.dataset.transform.conf.output_stride
 
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 
@@ -73,8 +74,10 @@ class Evaluate:
                 size_x, size_y, off_x, off_y = info
                 cp_idx_x, cp_idx_y = cp_idx
 
-                cx, cy = (cp_idx_x+off_x) * self.stride[0] , \
-                            (cp_idx_y+off_y) * self.stride[1]
+                # cx, cy = (cp_idx_x+off_x) * self.stride[0] , \
+                #             (cp_idx_y+off_y) * self.stride[1]
+                
+                cx, cy = (cp_idx_x+off_x), (cp_idx_y+off_y)
 
                 landmarks_pred.append({
                     "category_id": c,
@@ -86,41 +89,64 @@ class Evaluate:
 
     def __call__(self):
 
-        for image_for_model, _, original_sample in self.dataset:
+        for image_batch, _, n_landmarks_batch, padded_landmarks in tqdm(self.dataset, total=len(self.dataset)):
             # both image and landmarks will be resized to model_input_size
-            pred = self.model(image_for_model)
+            pred_batch = self.model(image_batch)
 
-            complete_heatmaps = T.cat(pred[1], 
-                                      pred[2])
+            reg_pred_batch = pred_batch[0]
+            heat_base_pred_batch = pred_batch[1]
+            heat_novel_pred_batch = pred_batch[2]
 
-            idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
+            for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
+                enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
 
-            landmarks_pred = self.landmarks_from_idxs(pred[0],
-                                                      complete_heatmaps,
-                                                      idxs_tensor)
+                complete_heatmaps = T.cat(heat_base_pred, heat_novel_pred)
+
+                idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
+
+                landmarks_pred = self.landmarks_from_idxs(
+                    reg_pred,
+                    complete_heatmaps,
+                    idxs_tensor
+                )
+
+                # Recreate the landmarks from the padded / batched version
+                landmarks_gt = []
+                for l in range(n_landmarks[i]):
+                    landmarks_gt.append({
+                        "center_point":(padded_landmarks[l]["center_point"][0][i], 
+                                        padded_landmarks[l]["center_point"][1][i]),
+                        "size":(padded_landmarks[l]["center_point"][0][i], 
+                                padded_landmarks[l]["center_point"][1][i]),
+                        "category_id":padded_landmarks[l]["category_id"][i]}
+                    )
+
+                pred_to_metric = []
+                for l in landmarks_pred:
+                    pred_to_metric.append({
+                        "boxes": l["center_point"] + l["size"],
+                        "labels": l["category_id"],
+                        "scores": l["confidence_score"]
+                    })
+
+                gt_to_metric = []
+                for l in landmarks_gt:
+                    gt_to_metric.append({
+                        "boxes": l["center_point"] + l["size"],
+                        "labels": l["category_id"]
+                    })
+
+                self.metric.update(
+                    preds=pred_to_metric, 
+                    target=gt_to_metric
+                )
             
-            _, landmarks_pred_resized_to_original = anti_transform_testing_after_model(image_for_model,
-                                                                                    landmarks_pred,
-                                                                                    TF.get_image_size(original_sample["image"]))
+        result = self.metric.compute()
+        
+        if self.prefix != "":
+            for key in result:
+                result[self.prefix + key] = result.pop(key)
 
-            pred_to_metric = []
-            for l in landmarks_pred_resized_to_original:
-                pred_to_metric.append({
-                    "boxes": l["center_point"] + l["size"],
-                    "labels": l["category_id"],
-                    "scores": l["confidence_score"]
-                })
-
-            gt_to_metric = []
-            for l in original_sample["landmarks"]:
-                gt_to_metric.append({
-                    "boxes": l["center_point"] + l["size"],
-                    "labels": l["category_id"]
-                })
-
-            self.metric.update(preds=pred_to_metric, 
-                               target=gt_to_metric)
-            
-        return self.metric.compute()
+        return result
         
 

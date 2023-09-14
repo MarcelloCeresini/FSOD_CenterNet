@@ -13,6 +13,8 @@ class TransformTraining:
                  base_classes: List = [],
                  novel_classes: List = []) -> None:
         
+        self.max_detections = conf.max_detections
+
         self.random_crop = RandomResizedCropOwn(size=conf.input_to_model_resolution,
                                                 scale=conf.crop_scale, # scale of the crop (before resizing) compared to original image
                                                 ratio=conf.crop_ratio) # aspect ratio of the crop (before resizing) compared to original image
@@ -57,8 +59,13 @@ class TransformTraining:
         
         labels = self.landmarks_to_labels(landmarks)
 
-        return (image, labels, len(landmarks)) #, landmarks , original_sample
-        
+        n_landmarks = len(landmarks)
+
+        padded_landmarks = landmarks + \
+            [{"center_point": (0,0), "size": (0,0), "category_id": -1}] * (self.max_detections - n_landmarks)
+
+        return image, labels, n_landmarks, padded_landmarks
+
 
 class TransformTesting:
     def __init__(self,
@@ -87,28 +94,33 @@ class TransformTesting:
 
         image = self.normalize(image)
 
-        return image, landmarks, original_sample
+        n_landmarks = len(landmarks)
+
+        padded_landmarks = landmarks + \
+            [{"center_point": (0,0), "size": (0,0), "category_id": -1}] * (self.max_detections - n_landmarks)
+
+        return image, None, n_landmarks, padded_landmarks
 
 
-def anti_transform_testing_after_model(current_image,
-                                       landmarks,
-                                       original_image_size) -> Tuple[T.tensor]:
-    '''
-    Returns the landmarks in the original image size after the output of the model
-    '''
+# def anti_transform_testing_after_model(current_image,
+#                                        landmarks,
+#                                        original_image_size) -> Tuple[T.tensor]:
+#     '''
+#     Returns the landmarks in the original image size after the output of the model
+#     '''
     
-    wi, hi = current_image.shape[1:]
-    wf, hf = original_image_size
+#     wi, hi = current_image.shape[1:]
+#     wf, hf = original_image_size
 
-    # resize
-    for l in landmarks:
-        l["center_point"] = (l["center_point"][0] * wf / wi,
-                             l["center_point"][1] * hf / hi)
+#     # resize
+#     for l in landmarks:
+#         l["center_point"] = (l["center_point"][0] * wf / wi,
+#                              l["center_point"][1] * hf / hi)
         
-        l["size"] = (l["size"][0] * wf / wi,
-                     l["size"][1] * hf / hi)
+#         l["size"] = (l["size"][0] * wf / wi,
+#                      l["size"][1] * hf / hi)
         
-    return current_image*255. , landmarks
+#     return current_image*255. , landmarks
 
 
         

@@ -7,6 +7,7 @@ import wandb
 from model import Model
 from .train_one_epoch import train_one_epoch
 from .losses import heatmap_loss, reg_loss
+from evaluation import Evaluate
 
 # CALLBACKS: 
 # - reduce learning rate on plateau
@@ -43,6 +44,7 @@ def train_loop(model,
                validation_loader,
                optimizer,
                device,
+               conf,
                weights_path=None,
                name="standard_model",
                novel_training=False):
@@ -66,20 +68,14 @@ def train_loop(model,
                                    device,
                                    novel_training=novel_training)
         
-        
-
         # Validate
         running_vloss = 0.0
         
         model.eval()
         with T.no_grad():
-            for i, (sample, transformed_landmarks, _) in tqdm(enumerate(validation_loader), total=len(validation_loader)):
+            for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), total=len(validation_loader)):
                 
-                n_detections = [len(l) for l in transformed_landmarks]
-
-                input_image, labels = sample
-
-                gt_reg, gt_heat_base, gt_heat_novel = labels        
+                gt_reg, gt_heat_base, gt_heat_novel = labels
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image)
 
                 if novel_training:
@@ -94,31 +90,51 @@ def train_loop(model,
                                                         n_detections),
                                 dim=0)
             
-                    # TODO: shouldnt the reg loss be computed on the novel head as well?
-                    vloss += T.mean(reg_loss_batched(pred_reg,
-                                                    gt_reg,
-                                                    n_detections),
-                                    dim=0)
+                vloss += T.mean(reg_loss(pred_reg,
+                                         gt_reg,
+                                         n_detections),
+                                dim=0)
                 
                 running_vloss += vloss
 
         avg_vloss = running_vloss / (i + 1)
 
-        # TODO: add some metric?
-
         print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
-        # TODO: Log the running loss averaged per batch for both training and validation
-        wandb.log({"epoch": epoch, 
-                   "loss": avg_loss,
-                   "val_loss": avg_vloss
-        })
+
+        log_dict = {
+            "epoch": epoch, 
+            "loss": avg_loss,
+            "val_loss": avg_vloss
+        }
+
+        if epoch % conf.epoch_metric_log_interval == 0:
+            # Evaluation on base test dataset
+            metrics_training = Evaluate(
+                model, 
+                training_loader, 
+                prefix="train"
+            )
+            metrics_validation = Evaluate(
+                model, 
+                validation_loader, 
+                prefix="val"
+            )
+
+            wandb.log(log_dict.update(metrics_training).update(metrics_validation))
+        else:
+            wandb.log(log_dict)
 
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
+            patience_counter = 0
             best_vloss = avg_vloss
 
             if not novel_training:
                 model_path = os.path.join(weights_path, 'best_base.pt')
                 T.save(model.state_dict(), model_path)
+
+        else:
+            # TODO: implement patience and/or reduce learning rate on plateau
+            patience_counter += 1
 
     return model

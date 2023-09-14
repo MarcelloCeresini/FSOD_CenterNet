@@ -111,9 +111,6 @@ class LandmarksToLabels:
             offset = [low_res_cp[i] - lr_cp_idx[i]
                       for i in range(len(low_res_cp))]
 
-            # TODO: is "size" this large? shouldn't it be normalized?
-            # TODO: also: does the regress label only contain the offset in the exact
-            # center point? Shouldn't it contain offsets within the gaussian radius too?
             regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0]
             regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1]
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]

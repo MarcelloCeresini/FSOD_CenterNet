@@ -16,6 +16,6 @@ class DatasetConfig:
         # sigma gaussian blur limits
         self.sgb_lims = (0.01, 2.0)
 
-        self.min_IoU_for_gaussian_radius = 0.3 # from "CornerNet: Detecting Objects as Paired Keypoints", paragraph 3.2
+        self.min_IoU_for_gaussian_radius = 0.8 # from "CornerNet: Detecting Objects as Paired Keypoints", paragraph 3.2
 
-        
+        self.max_detections = 100 # TODO: check this value

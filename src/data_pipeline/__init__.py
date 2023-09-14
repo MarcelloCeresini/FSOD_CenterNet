@@ -201,6 +201,7 @@ class DatasetsGenerator():
 
     def get_base_sets(self):
         # TODO: validation should have TransformTraining or TransformTesting?
+        # ANSWER: Training because it needs labels to compute the loss
         return (
             DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
                 base_classes=list(self.train_base.cats),

@@ -94,7 +94,7 @@ def main(args):
                             weights_path=conf['training']['save_base_weights_dir'],
                             name="standard_model_base")
             
-            # Evaluation on base test dataset
+            # Evaluation also on base test dataset
             metrics_base = Evaluate(model, dataset_base_test)
         
             with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
@@ -134,7 +134,6 @@ def main(args):
 
         for i in tqdm(range(total_trainings)):
 
-            # TODO: create wandb.config (possibly also stating that it's the "novel" training)
             with wandb.init(project="FSOD_CenterNet", 
                             group="novel_training",
                             config=conf):

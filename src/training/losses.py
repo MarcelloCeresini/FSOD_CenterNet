@@ -16,7 +16,13 @@ def heatmap_loss(pred_heatmap, gt_heatmap, num_keypoints):
         (1 - gt_heatmap) ** conf.beta_loss * (pred_heatmap) ** conf.alpha_loss * T.log(1 - pred_heatmap),
     ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
 
-    return -loss / num_keypoints
+    result = T.where(
+        num_keypoints != 0,
+        input = loss / num_keypoints,
+        other = 0
+    )
+
+    return result
 
 
 def reg_loss(pred_reg, gt_reg, num_keypoints):
@@ -38,5 +44,13 @@ def reg_loss(pred_reg, gt_reg, num_keypoints):
     loss_offset = T.where(gt_offset != 0., T.abs(pred_offset - gt_offset), 0.)\
         .reshape(pred_offset.shape[0], -1).sum(dim=-1)
     
-    return (loss_size*conf.lambda_size_loss + \
-            loss_offset*conf.lambda_offset_loss) / num_keypoints
+    loss = (loss_size*conf.lambda_size_loss + \
+            loss_offset*conf.lambda_offset_loss)
+    
+    result = T.where(
+        num_keypoints != 0,
+        input = loss / num_keypoints,
+        other = 0
+    )
+
+    return result
