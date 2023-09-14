@@ -2,6 +2,7 @@ import os
 from typing import Dict
 import torch as T
 from tqdm import tqdm
+import wandb
 
 from model import Model
 from .train_one_epoch import train_one_epoch
@@ -55,11 +56,15 @@ def train_loop(model,
         print('EPOCH {}:'.format(epoch + 1))
 
         # Train for one epoch
+        # TODO: does model.train() unfreeze the base weights while novel training?
+
         model.train()
         avg_loss = train_one_epoch(model,
                                    training_loader,
                                    optimizer,
                                    novel_training=novel_training)
+        
+        
 
         # Validate
         running_vloss = 0.0
@@ -87,6 +92,7 @@ def train_loop(model,
                                                         n_detections),
                                 dim=0)
             
+                    # TODO: shouldnt the reg loss be computed on the novel head as well?
                     vloss += T.mean(reg_loss_batched(pred_reg,
                                                     gt_reg,
                                                     n_detections),
@@ -96,9 +102,14 @@ def train_loop(model,
 
         avg_vloss = running_vloss / (i + 1)
 
-        print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
+        # TODO: add some metric?
 
+        print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
         # TODO: Log the running loss averaged per batch for both training and validation
+        wandb.log({"epoch": epoch, 
+                   "loss": avg_loss,
+                   "val_loss": avg_vloss
+        })
 
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
