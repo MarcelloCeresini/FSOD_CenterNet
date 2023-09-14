@@ -45,7 +45,7 @@ class CosHead(Module):
 
         # Multiply by tau and the adaptive scale factor, then return the sigmoid of the result
         # Note: adaptive_tau must once again be expanded to match the shape of the input
-        atau = self.tau * self.adaptive_scale_factor[None, :, :, None].expand(batch_size, -1, H, W)
+        atau = self.tau * self.adaptive_scale_factor[None, :, :, None].expand(batch_size, -1, H, W).to(out.device)
         out *= atau
         return out.sigmoid()
 
