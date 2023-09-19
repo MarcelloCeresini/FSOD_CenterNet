@@ -40,11 +40,12 @@ def train_one_epoch(model,
                     pred_reg, gt_reg, n_detections
                 ), dim=0)
         
-        loss.backward()
-        optimizer.step()
+        if loss > 0.:
+            steps += 1
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
 
-        running_loss += loss.item()
 
-
-    avg_loss = running_loss / (i + 1)
+    avg_loss = running_loss / steps
     return avg_loss

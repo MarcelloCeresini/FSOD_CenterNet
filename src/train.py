@@ -14,6 +14,10 @@ from model import Model
 from training import set_model_to_train_novel, train_loop
 
 
+# for k, v in model.state_dict().items():
+#     print(k, np.prod(v.size()))
+
+
 def parse_args():
     arps = argparse.ArgumentParser()
     arps.add_argument('-sett', '--settings', type=str, help='Settings YAML file')
@@ -63,6 +67,7 @@ def main(args):
 
         with wandb.init(project="FSOD_CenterNet", 
                         group="base_training",
+                        entity="marcello-e-federico",
                         config=conf):
 
             # Instantiate the model (only the base part)
@@ -70,6 +75,9 @@ def main(args):
                             n_base_classes = len(dataset_gen.train_base.cats),
                             head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'])
             model = model.to(device)
+
+            # TODO: change log_freq
+            wandb.watch(model, log='all', log_freq=10)
 
             # Use the dataset generator to generate the base set
             dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
@@ -86,13 +94,13 @@ def main(args):
                                 lr=conf['training']['base']['lr'])
         
             # Train the base model and save final weights
-            model = train_loop(model,
-                            epochs=conf['training']['base']['epochs'],
-                            training_loader=dataset_base_train,
-                            validation_loader=dataset_base_val,
-                            optimizer=optimizer_base,
-                            weights_path=conf['training']['save_base_weights_dir'],
-                            name="standard_model_base")
+            model = train_loop( model,
+                                conf,
+                                training_loader=dataset_base_train,
+                                validation_loader=dataset_base_val,
+                                optimizer=optimizer_base,
+                                device=device,
+                                name="standard_model_base")
             
             # Evaluation also on base test dataset
             metrics_base = Evaluate(model, dataset_base_test)

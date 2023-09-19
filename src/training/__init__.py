@@ -39,15 +39,18 @@ def set_model_to_train_novel(model: Model, conf: Dict):
 
 
 def train_loop(model,
-               epochs,
+               conf,
                training_loader,
                validation_loader,
                optimizer,
                device,
-               conf,
-               weights_path=None,
                name="standard_model",
                novel_training=False):
+    
+    train_group = 'base' if not novel_training else 'novel'
+    epochs = conf['training'][train_group]['epochs']
+    weights_path = conf['training']['save_base_weights_dir']
+    epoch_metric_log_interval = conf['training'][train_group]['epoch_metric_log_interval']
     
     print("####################")
     print(f"Started {'base' if not novel_training else 'novel'} training")
@@ -76,7 +79,7 @@ def train_loop(model,
             for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), total=len(validation_loader)):
                 
                 gt_reg, gt_heat_base, gt_heat_novel = labels
-                pred_reg, pred_heat_base, pred_heat_novel = model(input_image)
+                pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
 
                 if novel_training:
                     vloss = T.mean(heatmap_loss(pred_heat_novel,
@@ -107,17 +110,17 @@ def train_loop(model,
             "val_loss": avg_vloss
         }
 
-        if epoch % conf.epoch_metric_log_interval == 0:
+        if epoch % epoch_metric_log_interval == 0:
             # Evaluation on base test dataset
             metrics_training = Evaluate(
                 model, 
                 training_loader, 
-                prefix="train"
+                prefix="train/"
             )
             metrics_validation = Evaluate(
                 model, 
                 validation_loader, 
-                prefix="val"
+                prefix="val/"
             )
 
             wandb.log(log_dict.update(metrics_training).update(metrics_validation))

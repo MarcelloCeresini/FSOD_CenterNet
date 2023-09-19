@@ -30,6 +30,8 @@ class RandomResizedCropOwn():
                                self.size,
                                antialias=True)
         
+        top, left, h, w = float(top), float(left), float(h), float(w)
+        
         accepted = []
 
         # annotations are [cpX, cpY, sizeX, sizeY] but instead crop wants [top, left, h, w]
@@ -39,7 +41,7 @@ class RandomResizedCropOwn():
                         
             # TODO: is it ok if we accept bboxes ONLY IF THEIR CENTER IS IN THE CROP? 
             # TODO: do we need some stats to understand how many we reject?
-            if (0 <= new_cp[0] <= w) and (0 <= new_cp[1] <= h):
+            if (0 <= new_cp[0] < w) and (0 <= new_cp[1] < h):
 
                 accepted.append({
                     "center_point": new_cp,

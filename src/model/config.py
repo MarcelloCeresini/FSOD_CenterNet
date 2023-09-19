@@ -9,9 +9,9 @@ class Config:
         
         self.range_extender_cos_head = 10.0 # Fixed to 10. by the paper
 
-        self.alpha_loss = 0.9 # TODO: should be hyperparameter of focal loss
-        self.beta_loss = 0.9 # TODO: should be hyperparameter of focal loss
-        self.lambda_size_loss = 0.9 # TODO: is it ok?
-        self.lambda_offset_loss = 0.9 # TODO: is it ok?
+        self.alpha_loss = 2 # TODO: should be hyperparameter of focal loss
+        self.beta_loss = 4 # TODO: should be hyperparameter of focal loss
+        self.lambda_size_loss = 0.1 # TODO: is it ok?
+        self.lambda_offset_loss = 1. # TODO: is it ok?
 
         

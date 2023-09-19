@@ -9,12 +9,14 @@ training:
   train_novel: True
   base:
     lr: 0.001
-    epochs: 100
+    epochs: 2
+    epoch_metric_log_interval: 1
   novel:
     lr: 0.0001
     epochs: 50
+    epoch_metric_log_interval: 2
 
-  batch_size: 4
+  batch_size: 1
   num_workers: 1
   pin_memory: True
   drop_last: False
