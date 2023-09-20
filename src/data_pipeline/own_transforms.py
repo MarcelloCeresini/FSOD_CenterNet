@@ -24,40 +24,26 @@ class RandomResizedCropOwn():
         top, left, h, w = self.random_resize_crop.get_params(image, 
                                                         self.scale, 
                                                         self.ratio)
-        
+
         image = F.resized_crop(image,
                                top, left, h, w, 
                                self.size,
                                antialias=True)
         
-        top, left, h, w = float(top), float(left), float(h), float(w)
-        
-        accepted = []
+        # TODO: is it ok if we accept bboxes ONLY IF THEIR CENTER IS IN THE CROP? 
+        # TODO: do we need some stats to understand how many we reject?
+        accepted = [{
+            "center_point": ((l["center_point"][0]-left) * self.size[0] / w,
+                             (l["center_point"][1]-top)  * self.size[1] / h),
+            "size":         (l["size"][0] * self.size[0] / w,
+                             l["size"][1] * self.size[1] / h),
+            "category_id":   l["category_id"]
+        } 
+            for l in landmarks
+            if (left <= l["center_point"][0] < left + w) \
+                and (top <= l["center_point"][1] < top + h)
+        ]
 
-        # annotations are [cpX, cpY, sizeX, sizeY] but instead crop wants [top, left, h, w]
-        for l in landmarks:
-            new_cp = (l["center_point"][0] - left,
-                      l["center_point"][1] - top)
-                        
-            # TODO: is it ok if we accept bboxes ONLY IF THEIR CENTER IS IN THE CROP? 
-            # TODO: do we need some stats to understand how many we reject?
-            if (0 <= new_cp[0] < w) and (0 <= new_cp[1] < h):
-
-                accepted.append({
-                    "center_point": new_cp,
-                    "size":         l["size"],
-                    "category_id":  l["category_id"]
-                })
-        
-
-        # resize
-        for l in accepted:
-            l["center_point"] = (l["center_point"][0] * self.size[0] / w,
-                                 l["center_point"][1] * self.size[1] / h)
-            
-            l["size"] = (l["size"][0] * self.size[0] / w,
-                         l["size"][1] * self.size[1] / h)
-            
         return {"image": image, 
                 "landmarks": accepted}
 

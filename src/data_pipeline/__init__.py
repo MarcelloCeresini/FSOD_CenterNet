@@ -8,7 +8,7 @@ from tempfile import TemporaryFile
 from tqdm import tqdm
 
 from torch.utils.data import Dataset, DataLoader
-from torchvision.io import read_image
+from torchvision.io import read_image, ImageReadMode
 
 from pycocotools.coco import COCO
 
@@ -44,11 +44,9 @@ class DatasetFromCocoAnnotations(Dataset):
             - original_image_size
         '''
         current_image_id = self.idx_to_img[idx]['id']
+        img_name = os.path.join(self.images_dir, self.idx_to_img[idx]['file_name'])
 
-        img_name = os.path.join(self.images_dir,
-                                self.idx_to_img[idx]['file_name'])
-
-        image = read_image(img_name)
+        image = read_image(img_name, mode=ImageReadMode.RGB)
 
         # Add center point and size to annotations
         annotations_for_image = self.coco.imgToAnns[current_image_id]

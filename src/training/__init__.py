@@ -76,7 +76,8 @@ def train_loop(model,
         
         model.eval()
         with T.no_grad():
-            for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), total=len(validation_loader)):
+            for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), 
+                                                                                 total=len(validation_loader)):
                 
                 gt_reg, gt_heat_base, gt_heat_novel = labels
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
@@ -100,7 +101,7 @@ def train_loop(model,
                 
                 running_vloss += vloss
 
-        avg_vloss = running_vloss / (i + 1)
+        avg_vloss = running_vloss.item() / (i + 1)
 
         print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
 
@@ -115,17 +116,20 @@ def train_loop(model,
             metrics_training = Evaluate(
                 model, 
                 training_loader, 
-                prefix="train/"
-            )
+                prefix="train/",
+                device=device
+            )()
             metrics_validation = Evaluate(
                 model, 
                 validation_loader, 
-                prefix="val/"
-            )
+                prefix="val/",
+                device=device
+            )()
 
-            wandb.log(log_dict.update(metrics_training).update(metrics_validation))
-        else:
-            wandb.log(log_dict)
+            log_dict.update(metrics_training)
+            log_dict.update(metrics_validation)
+
+        wandb.log(log_dict)
 
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:

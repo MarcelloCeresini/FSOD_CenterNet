@@ -67,8 +67,8 @@ class LandmarksToLabels:
         cx, cy, sx, sy = landmark
         cx, cy = int(cx), int(cy)
 
-        radius = int(self.gaussian_radius((sx, sy), 
-                                          min_overlap=self.min_IoU_for_gaussian_radius))
+        # TODO: quick fix: force to at least 1
+        radius = max(int(self.gaussian_radius((sx, sy), min_overlap=self.min_IoU_for_gaussian_radius)), 1)
         
         gaussian = self.gaussian2D_kernel(radius, 
                                           sigma=radius / 3)

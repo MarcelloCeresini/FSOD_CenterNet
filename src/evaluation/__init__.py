@@ -1,6 +1,5 @@
 import torch as T
 import torch.nn.functional as NNF
-import torchvision.transforms.functional as TF
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
@@ -34,13 +33,13 @@ class Evaluate:
     def __init__(self,
                  model, 
                  dataset,
+                 device,
                  prefix=""):
         
         self.model   = model
         self.dataset = dataset
         self.prefix  = prefix
-        # TODO: not clear what you're trying to get here but dataloader has no attibute transform
-        # self.stride  = self.dataset.transform.conf.output_stride
+        self.device  = device
 
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 
@@ -73,9 +72,6 @@ class Evaluate:
 
                 size_x, size_y, off_x, off_y = info
                 cp_idx_x, cp_idx_y = cp_idx
-
-                # cx, cy = (cp_idx_x+off_x) * self.stride[0] , \
-                #             (cp_idx_y+off_y) * self.stride[1]
                 
                 cx, cy = (cp_idx_x+off_x), (cp_idx_y+off_y)
 
@@ -89,14 +85,13 @@ class Evaluate:
 
     def __call__(self):
 
-        for image_batch, _, n_landmarks_batch, padded_landmarks in tqdm(self.dataset, total=len(self.dataset)):
+        for image_batch, _, n_landmarks_batch, padded_landmarks in tqdm(self.dataset, 
+                                                                        total=len(self.dataset)):
             # both image and landmarks will be resized to model_input_size
-            pred_batch = self.model(image_batch)
+            reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
+                self.model(image_batch.to(self.device))
 
-            reg_pred_batch = pred_batch[0]
-            heat_base_pred_batch = pred_batch[1]
-            heat_novel_pred_batch = pred_batch[2]
-
+            # TODO: ERROR. DEPENDING ON WHETHER IT'S BASE OR NOVEL, NOVEL MAPS COULD BE NONE
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
                 enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
 
