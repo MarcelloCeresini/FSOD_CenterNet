@@ -101,6 +101,10 @@ def train_loop(model,
                 
                 running_vloss += vloss
 
+                # TODO: THIS IS ONLY FOR TESTING
+                if i > 2:
+                    break
+
         avg_vloss = running_vloss.item() / (i + 1)
 
         print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))

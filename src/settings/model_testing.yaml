@@ -9,7 +9,7 @@ training:
   train_novel: True
   base:
     lr: 0.001
-    epochs: 2
+    epochs: 1
     epoch_metric_log_interval: 1
   novel:
     lr: 0.0001

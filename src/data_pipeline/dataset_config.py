@@ -2,8 +2,8 @@
 class DatasetConfig:
     
     def __init__(self) -> None:
-        self.input_to_model_resolution = (512, 512)
-        self.output_resolution = (128, 128)
+        self.input_to_model_resolution = (64, 64)
+        self.output_resolution = (16, 16)
         self.output_stride = (self.input_to_model_resolution[0] // self.output_resolution[0],
                               self.input_to_model_resolution[1] // self.output_resolution[1])
 

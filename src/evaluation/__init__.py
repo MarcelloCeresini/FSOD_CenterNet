@@ -63,24 +63,27 @@ class Evaluate:
         for c in range(idxs_tensor.shape[0]):
 
             center_data = T.masked_select(regressor_pred, 
-                                          idxs_tensor[c])
+                                          idxs_tensor[c]).reshape((-1, 4))
             
             confidence_scores = T.masked_select(complete_heatmaps[c],
                                                 idxs_tensor[c])
-            
-            for info, score, cp_idx in zip(center_data, confidence_scores, idxs_tensor[c]):
 
-                size_x, size_y, off_x, off_y = info
-                cp_idx_x, cp_idx_y = cp_idx
-                
+            center_coords_x, center_coords_y = T.where(idxs_tensor[c])
+            
+            for info, score, cp_idx_x, cp_idx_y in \
+                zip(center_data, confidence_scores, center_coords_x, center_coords_y):
+
+                size_x, size_y, off_x, off_y = info                
                 cx, cy = (cp_idx_x+off_x), (cp_idx_y+off_y)
 
                 landmarks_pred.append({
-                    "category_id": c,
-                    "center_point": [cx, cy],
-                    "size": [size_x, size_y],
-                    "confidence_score": score
+                    "category_id": c,       # TODO: CHECK THAT THE FIRST CLASS IS 0 IN THE ORIGINAL DATASET, ...
+                    "center_point": [cx.item(), cy.item()],
+                    "size": [size_x.item(), size_y.item()],
+                    "confidence_score": score.item()
                 })
+        
+        return landmarks_pred
 
 
     def __call__(self):
@@ -91,29 +94,36 @@ class Evaluate:
             reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
                 self.model(image_batch.to(self.device))
 
-            # TODO: ERROR. DEPENDING ON WHETHER IT'S BASE OR NOVEL, NOVEL MAPS COULD BE NONE
+            if heat_novel_pred_batch is None:
+                heat_novel_pred_batch = [None] * heat_base_pred_batch.shape[0]
+
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
                 enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
 
-                complete_heatmaps = T.cat(heat_base_pred, heat_novel_pred)
+                if heat_novel_pred is None:
+                    complete_heatmaps = heat_base_pred
+                else:
+                    complete_heatmaps = T.cat(heat_base_pred, heat_novel_pred)
 
                 idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
 
+                # TODO: SORT BY CONFIDENCE SCORES AND CUT TO MAX NUMBER OF PREDICTIONS
                 landmarks_pred = self.landmarks_from_idxs(
                     reg_pred,
                     complete_heatmaps,
                     idxs_tensor
                 )
 
+
                 # Recreate the landmarks from the padded / batched version
                 landmarks_gt = []
-                for l in range(n_landmarks[i]):
+                for l in range(n_landmarks.item()):
                     landmarks_gt.append({
-                        "center_point":(padded_landmarks[l]["center_point"][0][i], 
-                                        padded_landmarks[l]["center_point"][1][i]),
-                        "size":(padded_landmarks[l]["center_point"][0][i], 
-                                padded_landmarks[l]["center_point"][1][i]),
-                        "category_id":padded_landmarks[l]["category_id"][i]}
+                        "center_point":(padded_landmarks[l]["center_point"][0][i].item(), 
+                                        padded_landmarks[l]["center_point"][1][i].item()),
+                        "size":(padded_landmarks[l]["center_point"][0][i].item(), 
+                                padded_landmarks[l]["center_point"][1][i].item()),
+                        "category_id":padded_landmarks[l]["category_id"][i].item()}
                     )
 
                 pred_to_metric = []
@@ -131,6 +141,7 @@ class Evaluate:
                         "labels": l["category_id"]
                     })
 
+                # TODO: THE METRIC ONLY WORKS IF PRED AND GT HAVE THE SAME NUMBER OF ELEMENTS
                 self.metric.update(
                     preds=pred_to_metric, 
                     target=gt_to_metric
