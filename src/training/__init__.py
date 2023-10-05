@@ -121,7 +121,8 @@ def train_loop(model,
                 model, 
                 training_loader, 
                 prefix="train/",
-                device=device
+                device=device,
+                conf=conf
             )()
             metrics_validation = Evaluate(
                 model, 
