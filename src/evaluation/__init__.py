@@ -55,73 +55,90 @@ class Evaluate:
                                        padding=1)
 
         return (complete_heatmaps == pooled_heatmaps)
-    
+
     def landmarks_from_idxs(self,
-                            regressor_pred,
-                            complete_heatmaps,
-                            idxs_tensor_mask):
-        
+                            regressor_pred: T.tensor,
+                            complete_heatmaps: T.tensor,
+                            idxs_tensor_mask: T.tensor):
+        # TODO: import a conf file here (maybe after uniting every config)
+
         n_classes, output_width, output_height = idxs_tensor_mask.shape
 
         max_detections = 100
         
-        landmarks_pred = []
+        landmarks_pred = {
+                    "boxes": T.zeros(max_detections,4),
+                    "labels": T.zeros(max_detections).to(T.int32),
+                    "scores": T.zeros(max_detections)
+                }
 
+        # landmarks_pred = [{"category_id": 0,
+        #                    "center_point": [0, 0],
+        #                    "size": [0, 0],
+        #                    "confidence_score": 0
+        #                    }] * max_detections
+
+        # flattens it so we can use topk
         confidence_scores = T.masked_select(complete_heatmaps,
                                             idxs_tensor_mask)
-        
+
         # the i-th element in top_k_scores has the i-th highest confidence score in the image, but its index refers to its position in "confidence_scores"
         # that has only n values, where n is the number of times that idxs_tensor_mask is true (it doesn't have n_classes*output_width*output_height indices)
-
         top_k_scores = T.topk(confidence_scores,
                               max_detections)
         
-        
-
-        full_idxs = T.nonzero(idxs_tensor_mask, as_tuple=False)
-
-
-
         # this retrieves all of the (flattened) indices (of the output image) where the classification has a peak
-        flattened_idxs = T.nonzero(T.flatten(idxs_tensor_mask))
+        flattened_idxs = T.nonzero(T.flatten(idxs_tensor_mask)).reshape(-1)
 
         # this retrieves only the top "max_detections" of them (but still, flattened)
         flattened_top_k_idxs = flattened_idxs[top_k_scores.indices]
 
-        unflattened_top_k_idxs = T.unflatten(flattened_top_k_idxs,
+        src = T.ones(n_classes*output_width*output_height).to(device="cuda")
+        flattened_top_k_mask = T.zeros_like(src).to(device="cuda").scatter_add_(dim=0,          
+                                                                                index=flattened_top_k_idxs,
+                                                                                src=src).bool()
+
+        unflattened_top_k_mask = T.unflatten(flattened_top_k_mask,
                                              dim=0,
-                                             sizes=(-1, output_width, output_height))
-
-        center_data = T.zeros(max_detections, 100)
-
-
-        # for c in range(idxs_tensor_mask.shape[0]):
+                                             sizes=(n_classes, output_width, output_height))
         
-        #     # TODO: check dimensions of idxs_tensor and select only topk given their confidence scores, 
-        #     # then use them to mask_select center_data
+        unflattened_top_k_idxs = T.nonzero(unflattened_top_k_mask)
 
-        #     # TODO: import a conf file here (maybe after uniting every config)
-        #     top_k_confidence = T.topk(confidence_scores,
-        #                               100)
+        regressor_pred_repeated = regressor_pred.repeat(n_classes,1,1).reshape(n_classes, *regressor_pred.shape)
 
-        #     center_data = T.masked_select(regressor_pred, 
-        #                                   idxs_tensor[c]).reshape((-1, 4))
+        size_x = T.masked_select(regressor_pred_repeated[:,0,:,:],
+                                 unflattened_top_k_mask)
+        size_y = T.masked_select(regressor_pred_repeated[:,1,:,:],
+                                 unflattened_top_k_mask)
+        off_x = T.masked_select(regressor_pred_repeated[:,2,:,:],
+                                 unflattened_top_k_mask)
+        off_y = T.masked_select(regressor_pred_repeated[:,3,:,:],
+                                 unflattened_top_k_mask)
 
-        #     center_coords_x, center_coords_y = T.where(idxs_tensor[c])
+        category = unflattened_top_k_idxs[:,0]
+        center_idx_x = unflattened_top_k_idxs[:,1]
+        center_idx_y = unflattened_top_k_idxs[:,2]
 
-        #     for info, score, cp_idx_x, cp_idx_y in \
-        #         zip(center_data, confidence_scores, center_coords_x, center_coords_y):
+        center_coord_x = center_idx_x+off_x
+        center_coord_y = center_idx_y+off_y
 
-        #         size_x, size_y, off_x, off_y = info                
-        #         cx, cy = (cp_idx_x+off_x), (cp_idx_y+off_y)
+        for i, (c, cx, cy, sx, sy, score) in \
+            enumerate(zip(category, center_coord_x, center_coord_y, size_x, size_y, confidence_scores)):
 
-        #         landmarks_pred.append({
-        #             "category_id": c,       # TODO: CHECK THAT THE FIRST CLASS IS 0 IN THE ORIGINAL DATASET, ...
-        #             "center_point": [cx.item(), cy.item()],
-        #             "size": [size_x.item(), size_y.item()],
-        #             "confidence_score": score.item()
-        #         })
-        
+                landmarks_pred["boxes"][i,0] = cx
+                landmarks_pred["boxes"][i,1] = cy
+                landmarks_pred["boxes"][i,2] = sx
+                landmarks_pred["boxes"][i,3] = sy
+                landmarks_pred["labels"][i] = c
+                landmarks_pred["scores"][i] = score
+                
+                # landmarks_pred[i]["category_id"] = c
+                # landmarks_pred[i]["center_point"][0] = cx
+                # landmarks_pred[i]["center_point"][1] = cy
+                # landmarks_pred[i]["size"][0] = sx
+                # landmarks_pred[i]["size"][1] = sy
+                # landmarks_pred[i]["confidence_score"] = score
+
         return landmarks_pred
 
 
@@ -139,24 +156,20 @@ class Evaluate:
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
                 enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
 
-                tic = time()
                 if heat_novel_pred is None:
                     complete_heatmaps = heat_base_pred
                 else:
                     complete_heatmaps = T.cat(heat_base_pred, heat_novel_pred)
 
                 idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
-                print("get_heatmap_maxima_idxs", time()-tic)
 
-                tic = time()
                 # TODO: SORT BY CONFIDENCE SCORES AND CUT TO MAX NUMBER OF PREDICTIONS
                 landmarks_pred = self.landmarks_from_idxs(
                     reg_pred,
                     complete_heatmaps,
                     idxs_tensor
                 )
-                print("landmarks_from_idxs", time()-tic)
-                tic = time()
+
                 # Recreate the landmarks from the padded / batched version
                 landmarks_gt = []
                 for l in range(n_landmarks.item()):
@@ -168,24 +181,20 @@ class Evaluate:
                         "category_id":padded_landmarks[l]["category_id"][i].item()}
                     )
 
-                print("retrieval", time()-tic)
 
-                tic = time()
-                pred_to_metric = {
-                    "boxes": [],
-                    "labels": [],
-                    "scores": []
-                }
-                for l in landmarks_pred:
-                    pred_to_metric["boxes"].append(l["center_point"] + l["size"])
-                    pred_to_metric["labels"].append(l["category_id"])
-                    pred_to_metric["scores"].append(l["confidence_score"])
+                # pred_to_metric = {
+                #     "boxes": [],
+                #     "labels": [],
+                #     "scores": []
+                # }
+                # for l in landmarks_pred:
+                #     pred_to_metric["boxes"].append(l["center_point"] + l["size"])
+                #     pred_to_metric["labels"].append(l["category_id"])
+                #     pred_to_metric["scores"].append(l["confidence_score"])
 
-                pred_to_metric["boxes"] = T.tensor(pred_to_metric["boxes"])
-                pred_to_metric["labels"] = T.tensor(pred_to_metric["labels"])
-                pred_to_metric["scores"] = T.tensor(pred_to_metric["scores"])
-
-                pred_to_metric = [pred_to_metric]
+                # pred_to_metric["boxes"] = T.tensor(pred_to_metric["boxes"])
+                # pred_to_metric["labels"] = T.tensor(pred_to_metric["labels"])
+                # pred_to_metric["scores"] = T.tensor(pred_to_metric["scores"])
 
                 gt_to_metric = {
                     "boxes": [],
@@ -198,26 +207,22 @@ class Evaluate:
                 gt_to_metric["boxes"] = T.tensor(gt_to_metric["boxes"])
                 gt_to_metric["labels"] = T.tensor(gt_to_metric["labels"])
 
-                gt_to_metric = [gt_to_metric]
-
-                print("conversion", time()-tic)
-                tic = time()
                 # TODO: THE METRIC ONLY WORKS IF PRED AND GT HAVE THE SAME NUMBER OF ELEMENTS
                 self.metric.update(
-                    preds=pred_to_metric, 
-                    target=gt_to_metric
+                    preds=[landmarks_pred], 
+                    target=[gt_to_metric]
                 )
-                print("update ",time()-tic)
             
             if counter > 10:
                 break
             
         result = self.metric.compute()
-        
+        result2 = {}
+
         if self.prefix != "":
             for key in result:
-                result[self.prefix + key] = result.pop(key)
+                result2[self.prefix + key] = result[key]
 
-        return result
+        return result2
         
 
