@@ -16,15 +16,15 @@ training:
   no_overwrite: False               #TODO: put it to True once base training is done
 
   train_base: True
-  train_novel: True
+  train_novel: False
   repeat_novel_training: 2
 
   base:
     lr: 0.001
     reduce_lr_patience: 8
     weight_decay: 0.0001
-    epochs: 5
-    epoch_metric_log_interval: 1
+    epochs: 100
+    epoch_metric_log_interval: 2
 
   novel:
     lr: 0.0001

@@ -170,8 +170,8 @@ class Evaluate:
             )
 
             # TODO: This is only for testing            
-            if counter > 10:
-                break
+            # if counter > 10:
+            #     break
 
         result = {
             self.prefix + k: v

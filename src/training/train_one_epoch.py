@@ -47,8 +47,8 @@ def train_one_epoch(model,
             running_loss += loss.item()
 
         # # TODO: THIS IS ONLY FOR TESTING
-        if steps > 2:
-            break
+        # if steps > 2:
+        #     break
 
     avg_loss = running_loss / steps
     return avg_loss
