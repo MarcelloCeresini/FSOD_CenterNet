@@ -4,7 +4,7 @@ from torchvision.transforms import ColorJitter, Compose, GaussianBlur
 
 from .dataset_config import DatasetConfig
 from .own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
-from .landmarks_to_labels import LandmarksToLabels
+from .landmarks_to_labels import LandmarksToLabels, LandmarksTransform
 
 
 class TransformTraining:
@@ -37,6 +37,7 @@ class TransformTraining:
         self.normalize = NormalizeOwn()
 
         self.landmarks_to_labels = LandmarksToLabels(conf, base_classes, novel_classes)
+        self.transform_landmarks = LandmarksTransform(conf)
  
 
     def __call__(self, 
@@ -53,16 +54,16 @@ class TransformTraining:
 
         image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
 
+        n_landmarks = len(landmarks)
+
         image = Compose([self.color_jitter,
                          self.gaussian_blur,
                          self.normalize])(image)
         
+        # TODO: changing here landmarks
         labels = self.landmarks_to_labels(landmarks)
 
-        n_landmarks = len(landmarks)
-
-        padded_landmarks = landmarks + \
-            [{"center_point": (0,0), "size": (0,0), "category_id": -1}] * (self.max_detections - n_landmarks)
+        padded_landmarks = self.transform_landmarks(landmarks)
 
         return image, labels, n_landmarks, padded_landmarks
 

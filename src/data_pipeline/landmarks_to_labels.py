@@ -25,6 +25,8 @@ class LandmarksToLabels:
         self.output_stride          = conf.output_stride
         self.min_IoU_for_gaussian_radius = conf.min_IoU_for_gaussian_radius
 
+        self.max_detections = conf.max_detections
+
     def gaussian_radius(self, det_size, min_overlap):
         '''
         Credit: https://github.com/xingyizhou/CenterNet/blob/master/src/lib/utils/image.py
@@ -95,12 +97,16 @@ class LandmarksToLabels:
 
     def __call__(self, 
                  landmarks) -> tuple():
-        
+
         regressor_label = T.zeros(self.regressor_label_size)
         heatmap_base    = T.zeros(self.heatmap_base_size)
         heatmap_novel   = T.zeros(self.heatmap_novel_size)
 
-        for l in landmarks:
+        for i, l in enumerate(landmarks):
+
+            if i >= self.max_detections:
+                break
+
             low_res_cp = [l["center_point"][i] / self.output_stride[i] 
                           for i in range(len(l["center_point"]))]
 
@@ -125,5 +131,29 @@ class LandmarksToLabels:
                 cat_idx = self.base_classes.index(cat)
                 heatmap_base[cat_idx, ...] = self.draw_gaussian(heatmap_base[cat_idx, ...], 
                                                                 [*lr_cp_idx, *l["size"]])
+            
 
         return regressor_label, heatmap_base, heatmap_novel
+    
+
+class LandmarksTransform:
+    def __init__(self, 
+                 conf: DatasetConfig):
+        self.max_detections = conf.max_detections
+
+    def __call__(self,
+             landmarks):
+        
+        padded_landmarks = {
+            "boxes": T.zeros(self.max_detections,4),
+            "labels": T.zeros(self.max_detections).to(T.int32),
+        }
+
+        for i, l in enumerate(landmarks):
+            padded_landmarks["boxes"][i,0] = l["center_point"][0]
+            padded_landmarks["boxes"][i,1] = l["center_point"][1]
+            padded_landmarks["boxes"][i,2] = l["size"][0]
+            padded_landmarks["boxes"][i,3] = l["size"][1]
+            padded_landmarks["labels"][i]  = l["category_id"]
+
+        return padded_landmarks

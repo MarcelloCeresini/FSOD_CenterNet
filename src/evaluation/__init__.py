@@ -70,7 +70,7 @@ class Evaluate:
                     "boxes": T.zeros(max_detections,4),
                     "labels": T.zeros(max_detections).to(T.int32),
                     "scores": T.zeros(max_detections)
-                }
+        }
 
         # landmarks_pred = [{"category_id": 0,
         #                    "center_point": [0, 0],
@@ -153,6 +153,7 @@ class Evaluate:
             if heat_novel_pred_batch is None:
                 heat_novel_pred_batch = [None] * heat_base_pred_batch.shape[0]
 
+            # iteration on batch_size
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
                 enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
 
@@ -170,47 +171,15 @@ class Evaluate:
                     idxs_tensor
                 )
 
-                # Recreate the landmarks from the padded / batched version
-                landmarks_gt = []
-                for l in range(n_landmarks.item()):
-                    landmarks_gt.append({
-                        "center_point":(padded_landmarks[l]["center_point"][0][i].item(), 
-                                        padded_landmarks[l]["center_point"][1][i].item()),
-                        "size":(padded_landmarks[l]["center_point"][0][i].item(), 
-                                padded_landmarks[l]["center_point"][1][i].item()),
-                        "category_id":padded_landmarks[l]["category_id"][i].item()}
-                    )
-
-
-                # pred_to_metric = {
-                #     "boxes": [],
-                #     "labels": [],
-                #     "scores": []
-                # }
-                # for l in landmarks_pred:
-                #     pred_to_metric["boxes"].append(l["center_point"] + l["size"])
-                #     pred_to_metric["labels"].append(l["category_id"])
-                #     pred_to_metric["scores"].append(l["confidence_score"])
-
-                # pred_to_metric["boxes"] = T.tensor(pred_to_metric["boxes"])
-                # pred_to_metric["labels"] = T.tensor(pred_to_metric["labels"])
-                # pred_to_metric["scores"] = T.tensor(pred_to_metric["scores"])
-
-                gt_to_metric = {
-                    "boxes": [],
-                    "labels": []
+                landmarks_gt = {
+                    "boxes": padded_landmarks["boxes"][i,...],
+                    "labels": padded_landmarks["labels"][i,...]
                 }
-                for l in landmarks_gt:
-                    gt_to_metric["boxes"].append(l["center_point"] + l["size"])
-                    gt_to_metric["labels"].append(l["category_id"])
-
-                gt_to_metric["boxes"] = T.tensor(gt_to_metric["boxes"])
-                gt_to_metric["labels"] = T.tensor(gt_to_metric["labels"])
 
                 # TODO: THE METRIC ONLY WORKS IF PRED AND GT HAVE THE SAME NUMBER OF ELEMENTS
                 self.metric.update(
                     preds=[landmarks_pred], 
-                    target=[gt_to_metric]
+                    target=[landmarks_gt]
                 )
             
             if counter > 10:
@@ -224,5 +193,3 @@ class Evaluate:
                 result2[self.prefix + key] = result[key]
 
         return result2
-        
-
