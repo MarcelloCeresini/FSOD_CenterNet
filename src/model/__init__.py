@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch
 from torch.nn import Module, Conv2d
 
@@ -9,14 +11,12 @@ from .head_heatmap import HeadHeatmap
 class Model(Module):
 
     def __init__(self, 
-                 encoder_name: str, 
+                 config: Dict,
                  n_base_classes: int, 
-                 head_base_heatmap_mode: str,
-                 n_novel_classes: int | None = None,
-                 head_novel_heatmap_mode: str | None = None) -> None:
+                 n_novel_classes: int | None = None) -> None:
         super().__init__()
 
-        self.encoder = Encoder(encoder_name)
+        self.encoder = Encoder(name=config['model']['encoder_name'])
 
         # get the number of channels of the last conv_layer of the encoder
         self.encoded_channels = list(filter(
@@ -28,16 +28,23 @@ class Model(Module):
 
         self.head_input_channels = self.neck.out_channels # input channels / 4
 
-        self.head_regressor = HeadRegressor(self.head_input_channels) # 2**3 because of the upsampling in the neck (halve the channels three times)
+        # 2**3 because of the upsampling in the neck (halve the channels three times)
+        self.head_regressor = HeadRegressor(config, self.head_input_channels)
 
-        self.head_base_heatmap = HeadHeatmap(self.head_input_channels,
-                                             n_base_classes,
-                                             head_base_heatmap_mode)
+        self.head_base_heatmap = HeadHeatmap(
+                config=config,
+                in_channels=self.head_input_channels,
+                n_classes=n_base_classes,
+                mode=config['model']['head_base_heatmap_mode']
+            )
 
-        if n_novel_classes is not None and head_novel_heatmap_mode is not None:
-            self.head_novel_heatmap = HeadHeatmap(self.head_input_channels,
-                                                n_novel_classes,
-                                                head_novel_heatmap_mode)
+        if n_novel_classes is not None and config['model']['head_novel_heatmap_mode'] is not None:
+                self.head_novel_heatmap = HeadHeatmap(
+                config=config,
+                in_channels=self.head_input_channels,
+                n_classes=n_novel_classes,
+                mode=config['model']['head_novel_heatmap_mode']
+            )
         else:
             print("Skipping instantating novel head")
             self.head_novel_heatmap = None

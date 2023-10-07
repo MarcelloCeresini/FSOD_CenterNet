@@ -1,15 +1,12 @@
 import math
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 import torch as T
 
-from .dataset_config import DatasetConfig
-
-
 class LandmarksToLabels:
     def __init__(self,
-                 conf: DatasetConfig,
+                 config: Dict,
                  base_class_list: List,
                  novel_class_list: List) -> None:
         
@@ -17,21 +14,19 @@ class LandmarksToLabels:
         self.novel_classes          = novel_class_list
 
         # model outputs (out_reg, out_heat_base, out_heat_novel)
-        self.output_resolution      = conf.output_resolution
+        self.output_stride          = config['data']['output_stride']
+        self.output_resolution      = [x // self.output_stride[i]
+            for i, x in enumerate(config['data']['input_to_model_resolution'])]
         self.regressor_label_size   = [4, *self.output_resolution]
         self.heatmap_base_size      = [len(self.base_classes), *self.output_resolution]
         self.heatmap_novel_size     = [len(self.novel_classes), *self.output_resolution]
-
-        self.output_stride          = conf.output_stride
-        self.min_IoU_for_gaussian_radius = conf.min_IoU_for_gaussian_radius
-
-        self.max_detections = conf.max_detections
+        self.min_IoU_for_gaussian_radius = config['data']['min_IoU_for_gaussian_radius']
+        self.max_detections = config['data']['max_detections']
 
     def gaussian_radius(self, det_size, min_overlap):
         '''
         Credit: https://github.com/xingyizhou/CenterNet/blob/master/src/lib/utils/image.py
         '''
-
         height, width = det_size
 
         a1  = 1
@@ -55,10 +50,7 @@ class LandmarksToLabels:
         
         
     def gaussian2D_kernel(self, radius, sigma=1):
-
-        x, y = np.ogrid[-radius:radius+1,
-                        -radius:radius+1]
-
+        x, y = np.ogrid[-radius:radius+1, -radius:radius+1]
         h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
         h[h < np.finfo(h.dtype).eps * h.max()] = 0
         return T.Tensor(h)
@@ -79,11 +71,6 @@ class LandmarksToLabels:
         
         space_left, space_right = min(cx, radius), min(width - cx, radius + 1)
         space_top, space_bottom = min(cy, radius), min(height -cy, radius + 1)
-
-        # masked_heatmap  = heatmap[cx - space_left: cx + space_right,
-        #                           cy - space_top: cy + space_bottom]
-        # masked_gaussian = gaussian[radius - space_left: radius + space_right,
-        #                            radius - space_top: radius + space_bottom]
         
         masked_heatmap  = heatmap[cy - space_top: cy + space_bottom,
                                   cx - space_left: cx + space_right]
@@ -110,10 +97,9 @@ class LandmarksToLabels:
             low_res_cp = [l["center_point"][i] / self.output_stride[i] 
                           for i in range(len(l["center_point"]))]
 
-            lr_cp_idx = [math.floor(low_res_cp[i]) 
+            lr_cp_idx = [min(math.floor(low_res_cp[i]), self.output_resolution[i] - 1)
                          for i in range(len(low_res_cp))]
 
-            # TODO: it was int, but I think it should be float?? Otherwise it's always 0
             offset = [low_res_cp[i] - lr_cp_idx[i]
                       for i in range(len(low_res_cp))]
 
@@ -131,15 +117,19 @@ class LandmarksToLabels:
                 cat_idx = self.base_classes.index(cat)
                 heatmap_base[cat_idx, ...] = self.draw_gaussian(heatmap_base[cat_idx, ...], 
                                                                 [*lr_cp_idx, *l["size"]])
-            
 
         return regressor_label, heatmap_base, heatmap_novel
     
 
 class LandmarksTransform:
     def __init__(self, 
-                 conf: DatasetConfig):
-        self.max_detections = conf.max_detections
+                 config: Dict,
+                 base_class_list: List,
+                 novel_class_list: List):
+
+        self.max_detections = config['data']['max_detections']
+        self.base_class_list = base_class_list
+        self.novel_class_list = novel_class_list
 
     def __call__(self,
              landmarks):
@@ -154,6 +144,8 @@ class LandmarksTransform:
             padded_landmarks["boxes"][i,1] = l["center_point"][1]
             padded_landmarks["boxes"][i,2] = l["size"][0]
             padded_landmarks["boxes"][i,3] = l["size"][1]
-            padded_landmarks["labels"][i]  = l["category_id"]
+            padded_landmarks["labels"][i]  = self.base_class_list.index(l["category_id"])   \
+                if l['category_id'] in self.base_class_list \
+                else self.novel_class_list.index(l["category_id"]) + len(self.base_class_list)
 
         return padded_landmarks

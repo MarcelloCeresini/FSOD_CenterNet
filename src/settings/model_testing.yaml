@@ -4,30 +4,70 @@ model:
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
+  head_regressor_latent_dim: 64     # output dimension of the first 3x3 convolution in the regressor head
+  head_heatmap_latent_dim: 64       # output dimension of the first 3x3 convolution in the heatmap head
+  range_extender_cos_head: 10.0     # Fixed to 10. by the paper
+  alpha_loss: 2                     # TODO: should be hyperparameter of focal loss
+  beta_loss: 4                      # TODO: should be hyperparameter of focal loss
+  lambda_size_loss: 0.1
+  lambda_offset_loss: 1.
+
 training:
-  no_overwrite: False #TODO: put it to True
+  no_overwrite: False               #TODO: put it to True once base training is done
+
   train_base: True
   train_novel: True
+  repeat_novel_training: 2
+
   base:
     lr: 0.001
-    epochs: 1
+    reduce_lr_patience: 8
+    weight_decay: 0.0001
+    epochs: 5
     epoch_metric_log_interval: 1
+
   novel:
     lr: 0.0001
-    epochs: 50
-    epoch_metric_log_interval: 2
+    reduce_lr_patience: 5
+    weight_decay: 0.0001
+    epochs: 5
+    epoch_metric_log_interval: 1
+  
+  loss_clip_norm: 1.0
 
-  batch_size: 1
-  num_workers: 1
+  batch_size: 2
+  num_workers: 2
   pin_memory: True
   drop_last: False
-  repeat_novel_training: 1
+
   save_base_weights_dir: ../data/weights/base/
   save_novel_weights_dir: ../data/weights/novel/
   save_training_info_dir: ../data/training_info/
 
+  base_weights_save_name: 'best_model.pt'
+  base_weights_load_name: 'best_model.pt'
+  base_stats_save_name: 'base_training_info.pkl'
+  novel_stats_save_name: 'novel_training_info.pkl'
+
 # Dataset parameters
 data:
+  input_to_model_resolution: [64, 64]
+  output_stride: [4, 4]
+
+  augmentations:
+    crop_scale: [0.5, 1.0]
+    crop_ratio: [0.5, 1.5]
+    p_vertical_flip: 0.5
+    p_horizontal_flip: 0.5
+    sgb_lims: [0.001, 2.0]
+    brightness_jitter: 0.2
+    contrast_jitter: 0.2
+    saturation_jitter: 0.2
+    hue_jitter: 0.1
+
+  min_IoU_for_gaussian_radius: 0.8
+  max_detections: 100
+
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
 
@@ -44,13 +84,13 @@ data:
                                         # we can instead pass two pre-made train and validation sets + a novel train
                                         # and a novel val sets that will directly be used.
 
-  K: 10                                 # The number of few shots for the novel classes. Can also be a list: in that case
+  K: [5,10]                                 # The number of few shots for the novel classes. Can also be a list: in that case
                                         # experiments will be repeated |K| times.
   
-  val_K: 20                             # The number of few shots for the novel classes in the val dataset. 
+  val_K: [15,20]                             # The number of few shots for the novel classes in the val dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
-  test_K: 20                            # The number of few shots for the novel classes in the test dataset. 
+  test_K: [15,20]                            # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
 paths:
@@ -68,5 +108,6 @@ paths:
 
 debug:
   debug_mode_active: True
+  wandb_watch_model_freq: 100
 
 device: cuda       # "cpu" or "cuda"

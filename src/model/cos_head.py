@@ -1,22 +1,23 @@
+from typing import Dict
+
 from torch import Tensor, randn, ones, cosine_similarity
 from torch.nn import Module, Parameter
 
-from .config import Config
-
 class CosHead(Module):
     def __init__(self,
+                 config: Dict,
                  n_classes: int,
                  mode: str) -> None:
-        super().__init__()
 
-        self.config = Config()
+        super().__init__()
+        config = config
 
         self.n_classes = n_classes
-        self.latent_dim = self.config.head_heatmap_latent_dim
+        self.latent_dim = config['model']['head_heatmap_latent_dim']
 
         self.class_prototypes = Parameter(randn(self.n_classes, self.latent_dim))
 
-        self.tau = self.config.range_extender_cos_head
+        self.tau = config['model']['range_extender_cos_head']
 
         if mode == "cos":
             self.adaptive_scale_factor = ones((self.n_classes, 1))
@@ -48,6 +49,3 @@ class CosHead(Module):
         atau = self.tau * self.adaptive_scale_factor[None, :, :, None].expand(batch_size, -1, H, W).to(out.device)
         out *= atau
         return out.sigmoid()
-
-
-        

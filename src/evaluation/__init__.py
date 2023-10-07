@@ -2,7 +2,6 @@ import torch as T
 import torch.nn.functional as NNF
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
-from time import time
 
 class Evaluate:
     '''
@@ -35,15 +34,14 @@ class Evaluate:
                  model, 
                  dataset,
                  device,
-                 conf,
+                 config,
                  prefix=""):
         
         self.model   = model
         self.dataset = dataset
         self.prefix  = prefix
         self.device  = device
-        self.conf = conf
-    
+        self.config  = config
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 
     def get_heatmap_maxima_idxs(self, 
@@ -60,64 +58,54 @@ class Evaluate:
                             regressor_pred: T.tensor,
                             complete_heatmaps: T.tensor,
                             idxs_tensor_mask: T.tensor):
-        # TODO: import a conf file here (maybe after uniting every config)
-
         n_classes, output_width, output_height = idxs_tensor_mask.shape
 
-        max_detections = 100
+        num_detections = T.sum(idxs_tensor_mask).to('cpu')
+        num_detections = min(self.config['data']['max_detections'], num_detections)
         
         landmarks_pred = {
-                    "boxes": T.zeros(max_detections,4),
-                    "labels": T.zeros(max_detections).to(T.int32),
-                    "scores": T.zeros(max_detections)
+            "boxes": T.zeros(num_detections,4),
+            "labels": T.zeros(num_detections).to(T.int32),
+            "scores": T.zeros(num_detections)
         }
 
-        # landmarks_pred = [{"category_id": 0,
-        #                    "center_point": [0, 0],
-        #                    "size": [0, 0],
-        #                    "confidence_score": 0
-        #                    }] * max_detections
+        # Flattens it so we can use topk
+        confidence_scores = T.masked_select(complete_heatmaps, idxs_tensor_mask)
 
-        # flattens it so we can use topk
-        confidence_scores = T.masked_select(complete_heatmaps,
-                                            idxs_tensor_mask)
-
-        # the i-th element in top_k_scores has the i-th highest confidence score in the image, but its index refers to its position in "confidence_scores"
-        # that has only n values, where n is the number of times that idxs_tensor_mask is true (it doesn't have n_classes*output_width*output_height indices)
-        top_k_scores = T.topk(confidence_scores,
-                              max_detections)
+        # The i-th element in top_k_scores has the i-th highest confidence score in the image, 
+        # but its index refers to its position in "confidence_scores" (which is a flattened tensor
+        # tthat has as many elements as idxs_tensor_mask's true values, or peaks).
+        # Instead, we will need a n_classes*output_width*output_height tensor to get indices
+        top_k_scores = T.topk(confidence_scores, num_detections)
         
-        # this retrieves all of the (flattened) indices (of the output image) where the classification has a peak
+        # This retrieves all of the (flattened) indices (of the output image) where the classification has a peak
         flattened_idxs = T.nonzero(T.flatten(idxs_tensor_mask)).reshape(-1)
 
-        # this retrieves only the top "max_detections" of them (but still, flattened)
+        # this retrieves only the top "num_detections" of them (but still, flattened)
         flattened_top_k_idxs = flattened_idxs[top_k_scores.indices]
 
-        src = T.ones(n_classes*output_width*output_height).to(device="cuda")
-        flattened_top_k_mask = T.zeros_like(src).to(device="cuda").scatter_add_(dim=0,          
-                                                                                index=flattened_top_k_idxs,
-                                                                                src=src).bool()
+        base_mask = T.zeros(n_classes*output_width*output_height).to(device=self.device)
+        # Populates the mask with 1s for topk indices
+        base_mask[flattened_top_k_idxs] += 1
+        mask = base_mask.to(dtype=T.bool)
 
-        unflattened_top_k_mask = T.unflatten(flattened_top_k_mask,
-                                             dim=0,
-                                             sizes=(n_classes, output_width, output_height))
-        
-        unflattened_top_k_idxs = T.nonzero(unflattened_top_k_mask)
+        top_k_mask = T.unflatten(mask, dim=0, sizes=(n_classes, output_width, output_height))
+        top_k_idxs = T.nonzero(top_k_mask)
 
-        regressor_pred_repeated = regressor_pred.repeat(n_classes,1,1).reshape(n_classes, *regressor_pred.shape)
+        regressor_pred_repeated = regressor_pred.repeat(n_classes,1,1,1)
 
         size_x = T.masked_select(regressor_pred_repeated[:,0,:,:],
-                                 unflattened_top_k_mask)
+                                 top_k_mask)
         size_y = T.masked_select(regressor_pred_repeated[:,1,:,:],
-                                 unflattened_top_k_mask)
+                                 top_k_mask)
         off_x = T.masked_select(regressor_pred_repeated[:,2,:,:],
-                                 unflattened_top_k_mask)
+                                 top_k_mask)
         off_y = T.masked_select(regressor_pred_repeated[:,3,:,:],
-                                 unflattened_top_k_mask)
+                                 top_k_mask)
 
-        category = unflattened_top_k_idxs[:,0]
-        center_idx_x = unflattened_top_k_idxs[:,1]
-        center_idx_y = unflattened_top_k_idxs[:,2]
+        category = top_k_idxs[:,0]
+        center_idx_y = top_k_idxs[:,1]
+        center_idx_x = top_k_idxs[:,2]
 
         center_coord_x = center_idx_x+off_x
         center_coord_y = center_idx_y+off_y
@@ -131,28 +119,25 @@ class Evaluate:
                 landmarks_pred["boxes"][i,3] = sy
                 landmarks_pred["labels"][i] = c
                 landmarks_pred["scores"][i] = score
-                
-                # landmarks_pred[i]["category_id"] = c
-                # landmarks_pred[i]["center_point"][0] = cx
-                # landmarks_pred[i]["center_point"][1] = cy
-                # landmarks_pred[i]["size"][0] = sx
-                # landmarks_pred[i]["size"][1] = sy
-                # landmarks_pred[i]["confidence_score"] = score
 
         return landmarks_pred
 
 
-    def __call__(self):
+    def __call__(self, is_novel=False):
 
-        for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(enumerate(self.dataset), 
-                                                                                   total=len(self.dataset),
-                                                                                   desc="Evaluation " + self.prefix):
+        for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
+                enumerate(self.dataset), total=len(self.dataset), position=1 + int(is_novel), 
+                leave=False, desc="Evaluation " + self.prefix):
+            
             # both image and landmarks will be resized to model_input_size
             reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
                 self.model(image_batch.to(self.device))
 
             if heat_novel_pred_batch is None:
                 heat_novel_pred_batch = [None] * heat_base_pred_batch.shape[0]
+
+            pred_batch = []
+            gt_batch   = []
 
             # iteration on batch_size
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
@@ -161,11 +146,10 @@ class Evaluate:
                 if heat_novel_pred is None:
                     complete_heatmaps = heat_base_pred
                 else:
-                    complete_heatmaps = T.cat(heat_base_pred, heat_novel_pred)
+                    complete_heatmaps = T.cat([heat_base_pred, heat_novel_pred])
 
                 idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
 
-                # TODO: SORT BY CONFIDENCE SCORES AND CUT TO MAX NUMBER OF PREDICTIONS
                 landmarks_pred = self.landmarks_from_idxs(
                     reg_pred,
                     complete_heatmaps,
@@ -173,24 +157,25 @@ class Evaluate:
                 )
 
                 landmarks_gt = {
-                    "boxes": padded_landmarks["boxes"][i,...],
-                    "labels": padded_landmarks["labels"][i,...]
+                    "boxes": padded_landmarks["boxes"][i,:n_landmarks,:],
+                    "labels": padded_landmarks["labels"][i,:n_landmarks]
                 }
 
-                # TODO: THE METRIC ONLY WORKS IF PRED AND GT HAVE THE SAME NUMBER OF ELEMENTS
-                self.metric.update(
-                    preds=[landmarks_pred], 
-                    target=[landmarks_gt]
-                )
-            
+                pred_batch.append(landmarks_pred)
+                gt_batch.append(landmarks_gt)
+
+            self.metric.update(
+                preds=pred_batch, 
+                target=gt_batch
+            )
+
+            # TODO: This is only for testing            
             if counter > 10:
                 break
-            
-        result = self.metric.compute()
-        result2 = {}
 
-        if self.prefix != "":
-            for key in result:
-                result2[self.prefix + key] = result[key]
+        result = {
+            self.prefix + k: v
+            for k, v in self.metric.compute().items()
+        }
 
-        return result2
+        return result
