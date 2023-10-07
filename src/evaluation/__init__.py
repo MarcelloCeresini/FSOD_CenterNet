@@ -145,7 +145,8 @@ class Evaluate:
     def __call__(self):
 
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(enumerate(self.dataset), 
-                                                                             total=len(self.dataset)):
+                                                                                   total=len(self.dataset),
+                                                                                   desc="Evaluation " + self.prefix):
             # both image and landmarks will be resized to model_input_size
             reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
                 self.model(image_batch.to(self.device))

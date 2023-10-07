@@ -79,6 +79,7 @@ class TransformTesting:
         self.normalize = NormalizeOwn()
 
         self.landmarks_to_labels = LandmarksToLabels(conf, base_classes, novel_classes)
+        self.transform_landmarks = LandmarksTransform(conf)
 
 
     def __call__(self, 
@@ -97,10 +98,9 @@ class TransformTesting:
 
         n_landmarks = len(landmarks)
 
-        padded_landmarks = landmarks + \
-            [{"center_point": (0,0), "size": (0,0), "category_id": -1}] * (self.max_detections - n_landmarks)
+        padded_landmarks = self.transform_landmarks(landmarks)
 
-        return image, None, n_landmarks, padded_landmarks
+        return image, 0, n_landmarks, padded_landmarks
 
 
 # def anti_transform_testing_after_model(current_image,

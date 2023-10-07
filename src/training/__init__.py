@@ -77,7 +77,8 @@ def train_loop(model,
         model.eval()
         with T.no_grad():
             for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), 
-                                                                                 total=len(validation_loader)):
+                                                                                 total=len(validation_loader),
+                                                                                 desc="Validation "+ ("base" if not novel_training else "novel")):
                 
                 gt_reg, gt_heat_base, gt_heat_novel = labels
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
@@ -128,7 +129,8 @@ def train_loop(model,
                 model, 
                 validation_loader, 
                 prefix="val/",
-                device=device
+                device=device,
+                conf=conf
             )()
 
             log_dict.update(metrics_training)
@@ -142,6 +144,7 @@ def train_loop(model,
             best_vloss = avg_vloss
 
             if not novel_training:
+                os.makedirs(weights_path, exist_ok=True)
                 model_path = os.path.join(weights_path, 'best_base.pt')
                 T.save(model.state_dict(), model_path)
 

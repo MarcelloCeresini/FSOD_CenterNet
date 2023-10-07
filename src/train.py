@@ -33,7 +33,7 @@ def main(args):
 
     conf = load_settings(args.settings)
 
-    if os.path.exists(conf['training']['save_base_weights_dir']) and conf["train_base"]:
+    if os.path.exists(conf['training']['save_base_weights_dir']) and conf["training"]["train_base"] and conf["training"]["no_overwrite"]:
         raise ValueError("Cannot overwrite weights")
 
     debug_mode = conf['debug']['debug_mode_active']
@@ -103,10 +103,16 @@ def main(args):
                                 name="standard_model_base")
             
             # Evaluation also on base test dataset
-            metrics_base = Evaluate(model, dataset_base_test)
+            metrics_base_test = Evaluate(
+                model, 
+                dataset_base_test, 
+                prefix="test/",
+                device=device,
+                conf=conf
+            )()
         
             with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
-                pickle.dump(metrics_base, f)
+                pickle.dump(metrics_base_test, f)
 
     ## NOVEL TRAININGS ##
 
@@ -140,7 +146,7 @@ def main(args):
         # START TRAINING!
         total_trainings = len(K) * n_repeats_novel_train
 
-        for i in tqdm(range(total_trainings)):
+        for i in tqdm(range(total_trainings), desc="Novel trainings"):
 
             with wandb.init(project="FSOD_CenterNet", 
                             group="novel_training",

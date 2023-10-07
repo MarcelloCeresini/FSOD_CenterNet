@@ -5,6 +5,7 @@ model:
   head_novel_heatmap_mode: AdaptiveCosHead
 
 training:
+  no_overwrite: False #TODO: put it to True
   train_base: True
   train_novel: True
   base:

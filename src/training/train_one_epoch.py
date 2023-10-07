@@ -15,7 +15,9 @@ def train_one_epoch(model,
     running_loss = 0.
     steps = 0
 
-    for i, (input_image, labels, n_detections, _) in tqdm(enumerate(training_loader), total=len(training_loader)):
+    for i, (input_image, labels, n_detections, _) in tqdm(enumerate(training_loader), 
+                                                          total=len(training_loader),
+                                                          desc="Train epoch " + ("base" if not novel_training else "novel")):
         loss = 0
         optimizer.zero_grad()
 
