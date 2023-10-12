@@ -122,7 +122,7 @@ class Evaluate:
 
         return landmarks_pred
 
-
+    @T.no_grad()
     def __call__(self, is_novel=False):
 
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
