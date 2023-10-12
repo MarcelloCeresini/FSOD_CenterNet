@@ -48,7 +48,6 @@ def main(args):
     if isinstance(val_K, int): val_K = [val_K]
     if isinstance(test_K, int): test_K = [test_K]
 
-
     # Dataset generator. Only one of these has to be instantiated. It always returns
     dataset_gen = DatasetsGenerator(config)
     
@@ -94,22 +93,30 @@ def main(args):
                                 scheduler=scheduler_base,
                                 device=device)
             
+            # Evaluation on base train dataset
+            metrics = Evaluate(
+                model, 
+                dataset_base_train, 
+                prefix="train/",
+                device=device,
+                config=config
+            )(is_novel=False)
             # Evaluation also on base test dataset
-            metrics_base_test = Evaluate(
+            metrics_test = Evaluate(
                 model, 
                 dataset_base_test, 
                 prefix="test/",
                 device=device,
                 config=config
-            )()
-        
+            )(is_novel=False)
+            metrics.update(metrics_test)
+
             # TODO: add timestamp so that it doesn't overwrite the same metrics over and over
             with open(os.path.join(config['training']['save_training_info_dir'], 
                                    config['training']['base_stats_save_name']), 'wb') as f:
-                pickle.dump(metrics_base_test, f)
+                pickle.dump(metrics, f)
 
     ## NOVEL TRAININGS ##
-
     if config['training']['train_novel']:
         
         metrics_novel_list = {k: [] for k in K}
@@ -134,10 +141,8 @@ def main(args):
                         n_base_classes = len(dataset_gen.train_base.cats),
                         n_novel_classes=config['data']['novel_classes_to_sample'])
 
-
         # START TRAINING!
         total_trainings = len(K) * n_repeats_novel_train
-
         for i in tqdm(range(total_trainings), position=0, desc="Novel trainings: ", leave=True):
 
             with wandb.init(project="FSOD_CenterNet", 
@@ -188,7 +193,9 @@ def main(args):
                 wandb.watch(model, log='all', log_freq=config['debug']['wandb_watch_model_freq'])
 
                 # Evaluation on novel_dataset
-                metrics_novel = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
+                metrics_novel = Evaluate(model, dataset_novel_train, device, config, prefix="train/")(is_novel=True)
+                m = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
+                metrics_novel.update(m)
                 metrics_novel_list[current_train_K].append(metrics_novel)
 
                 # TODO: merge the two datasets

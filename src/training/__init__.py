@@ -58,6 +58,7 @@ def train_loop(model,
     # print("####################")
 
     best_vloss = 1e10
+    batch_count = 0
 
     for epoch in tqdm(range(epochs), 
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
@@ -67,12 +68,13 @@ def train_loop(model,
 
         # Train for one epoch
         model.train()
-        avg_loss = train_one_epoch(model,
-                                   config,
-                                   training_loader,
-                                   optimizer,
-                                   device,
-                                   novel_training=novel_training)
+        avg_loss, batch_count = train_one_epoch(model,
+                                                config,
+                                                training_loader,
+                                                optimizer,
+                                                device,
+                                                novel_training=novel_training,
+                                                batch_count=batch_count)
 
         # Validate
         running_vloss = 0.0
@@ -92,7 +94,6 @@ def train_loop(model,
                                                 n_detections,
                                                 config),
                                    dim=0)
-
                 else:
                     vloss = T.mean(heatmap_loss(pred_heat_base,
                                                 gt_heat_base,
@@ -108,29 +109,15 @@ def train_loop(model,
 
                 running_vloss += vloss
 
-                # TODO: THIS IS ONLY FOR TESTING
-                # if i > 2:
-                #     break
-
         avg_vloss = running_vloss.item() / (i + 1)
-
-        # print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
 
         log_dict = {
             "epoch": epoch, 
-            "loss": avg_loss,
-            "val_loss": avg_vloss
+            "train/avg_loss": avg_loss,
+            "val/avg_loss": avg_vloss
         }
 
         if epoch % epoch_metric_log_interval == 0:
-            # Evaluation on base test dataset
-            metrics_training = Evaluate(
-                model, 
-                training_loader, 
-                prefix="train/",
-                device=device,
-                config=config
-            )(is_novel=novel_training)
             metrics_validation = Evaluate(
                 model, 
                 validation_loader, 
@@ -138,8 +125,6 @@ def train_loop(model,
                 device=device,
                 config=config
             )(is_novel=novel_training)
-
-            log_dict.update(metrics_training)
             log_dict.update(metrics_validation)
 
         wandb.log(log_dict)

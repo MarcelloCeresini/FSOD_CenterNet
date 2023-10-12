@@ -1,5 +1,6 @@
 import torch as T
 from tqdm import tqdm
+import wandb
 
 from .losses import heatmap_loss, reg_loss
 
@@ -8,8 +9,9 @@ def train_one_epoch(model,
                     training_loader,
                     optimizer,
                     device,
-                    novel_training=False):
-    
+                    novel_training=False,
+                    batch_count=0):
+
     running_loss = 0.
 
     for i, (input_image, labels, n_detections, _) in tqdm(enumerate(training_loader), 
@@ -40,13 +42,12 @@ def train_one_epoch(model,
         loss = loss_1 + loss_2
         
         loss.backward()
-        T.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config['training']['loss_clip_norm'])
+        T.nn.utils.clip_grad_norm_(model.parameters(), 
+                                   max_norm=config['training']['loss_clip_norm'])
         optimizer.step()
         running_loss += loss.item()
 
-        # # TODO: THIS IS ONLY FOR TESTING
-        # if steps > 2:
-        #     break
+        wandb.log({'loss': loss.item(), 'batch': batch_count + i})
 
     avg_loss = running_loss / (i + 1)
-    return avg_loss
+    return avg_loss, batch_count + i + 1

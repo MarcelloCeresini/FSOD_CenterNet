@@ -44,14 +44,13 @@ class Evaluate:
         self.config  = config
         self.metric = MeanAveragePrecision(box_format="cxcywh")
 
+    @T.no_grad()
     def get_heatmap_maxima_idxs(self, 
                                 complete_heatmaps):
-        
         pooled_heatmaps = NNF.max_pool2d(complete_heatmaps,
                                        3,
                                        stride=1,
                                        padding=1)
-
         return (complete_heatmaps == pooled_heatmaps)
 
     def landmarks_from_idxs(self,
@@ -128,7 +127,7 @@ class Evaluate:
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
                 enumerate(self.dataset), total=len(self.dataset), position=1 + int(is_novel), 
                 leave=False, desc="Evaluation " + self.prefix):
-            
+
             # both image and landmarks will be resized to model_input_size
             reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
                 self.model(image_batch.to(self.device))
@@ -169,13 +168,8 @@ class Evaluate:
                 target=gt_batch
             )
 
-            # TODO: This is only for testing            
-            # if counter > 10:
-            #     break
-
         result = {
             self.prefix + k: v
             for k, v in self.metric.compute().items()
         }
-
         return result
