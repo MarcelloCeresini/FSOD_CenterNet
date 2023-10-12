@@ -76,9 +76,12 @@ def main(args):
             #     # sample, landmarks, original_image_size = dataset_base_train[0]
             #     # use "show_images.py" functions to show the sample / samples
 
-            optimizer_base = Adam(model.parameters(), 
-                                lr=config['training']['base']['lr'],
-                                weight_decay=config['training']['base']['weight_decay'])
+            optimizer_base = Adam([
+                    {'params': model.encoder.parameters(), 'lr': config['training']['base']['encoder_lr']},
+                    {'params': [t for k, t in model.named_parameters() if 'encoder' not in k]}
+                ], 
+                lr=config['training']['base']['lr'],
+                weight_decay=config['training']['base']['weight_decay'])
 
             scheduler_base = T.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer_base, patience=config['training']['base']['reduce_lr_patience']
