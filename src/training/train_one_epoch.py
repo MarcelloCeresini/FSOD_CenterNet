@@ -11,7 +11,6 @@ def train_one_epoch(model,
                     novel_training=False):
     
     running_loss = 0.
-    steps = 0
 
     for i, (input_image, labels, n_detections, _) in tqdm(enumerate(training_loader), 
                                                           total=len(training_loader),
@@ -25,30 +24,29 @@ def train_one_epoch(model,
         pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
 
         if novel_training:
-            loss += T.mean(heatmap_loss(
+            loss_1 = T.mean(heatmap_loss(
                         pred_heat_novel, gt_heat_novel, n_detections, config
                     ), dim=0)
             
         else:
-            loss += T.mean(heatmap_loss(
+            loss_1 = T.mean(heatmap_loss(
                         pred_heat_base, gt_heat_base, n_detections, config
                     ), dim=0)
             
-        loss += T.mean(reg_loss(
+        loss_2 = T.mean(reg_loss(
                     pred_reg, gt_reg, n_detections, config
                 ), dim=0)
         
-        if loss > 0.:
-            steps += 1
-            loss.backward()
-            T.nn.utils.clip_grad_norm_(model.parameters(), 
-                                       max_norm=config['training']['loss_clip_norm'])
-            optimizer.step()
-            running_loss += loss.item()
+        loss = loss_1 + loss_2
+        
+        loss.backward()
+        T.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config['training']['loss_clip_norm'])
+        optimizer.step()
+        running_loss += loss.item()
 
         # # TODO: THIS IS ONLY FOR TESTING
         # if steps > 2:
         #     break
 
-    avg_loss = running_loss / steps
+    avg_loss = running_loss / (i + 1)
     return avg_loss
