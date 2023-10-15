@@ -14,10 +14,6 @@ from model import Model
 from training import set_model_to_train_novel, train_loop
 
 
-# for k, v in model.state_dict().items():
-#     print(k, np.prod(v.size()))
-
-
 def parse_args():
     arps = argparse.ArgumentParser()
     arps.add_argument('-sett', '--settings', type=str, help='Settings YAML file')
@@ -31,94 +27,102 @@ def load_settings(settings_path: str):
 
 def main(args):
 
-    conf = load_settings(args.settings)
+    config = load_settings(args.settings)
 
-    if os.path.exists(conf['training']['save_base_weights_dir']) and conf["training"]["train_base"] and conf["training"]["no_overwrite"]:
+    if os.path.exists(config['training']['save_base_weights_dir']) \
+                  and config["training"]["train_base"] \
+                  and config["training"]["no_overwrite"]:
         raise ValueError("Cannot overwrite weights")
 
-    debug_mode = conf['debug']['debug_mode_active']
-    device = conf['device']
+    os.makedirs(config['training']['save_training_info_dir'], exist_ok=True)
 
-    K = conf['data']['K']
-    val_K = conf['data']['val_K']
-    test_K = conf['data']['test_K']
-    n_repeats_novel_train = conf['training']['repeat_novel_training']
+    debug_mode = config['debug']['debug_mode_active']
+    device = config['device']
+
+    K = config['data']['K']
+    val_K = config['data']['val_K']
+    test_K = config['data']['test_K']
+    n_repeats_novel_train = config['training']['repeat_novel_training']
 
     if isinstance(K, int): K = [K]
     if isinstance(val_K, int): val_K = [val_K]
     if isinstance(test_K, int): test_K = [test_K]
 
-
     # Dataset generator. Only one of these has to be instantiated. It always returns
-    dataset_gen = DatasetsGenerator(
-        annotations_path = conf['paths']['annotations_path'],
-        images_dir = conf['paths']['images_dir'],
-        novel_class_ids_path = conf['paths']['novel_classes_ids_path'],
-        train_set_path = conf['paths']['train_base_annotations_path'],
-        val_set_path = conf['paths']['val_base_annotations_path'],
-        test_set_path = conf['paths']['test_base_annotations_path'],
-        use_fixed_novel_sets = conf['data']['use_fixed_sets'],
-        novel_train_set_path = conf['paths']['train_novel_annotations_path'],
-        novel_val_set_path = conf['paths']['val_novel_annotations_path'],
-        novel_test_set_path = conf['paths']['test_novel_annotations_path']
-    )
+    dataset_gen = DatasetsGenerator(config)
     
-    if conf['training']['train_base']:
+    if config['training']['train_base']:
 
         with wandb.init(project="FSOD_CenterNet", 
                         group="base_training",
                         entity="marcello-e-federico",
-                        config=conf):
+                        config=config):
 
             # Instantiate the model (only the base part)
-            model = Model(  encoder_name = conf['model']['encoder_name'], 
-                            n_base_classes = len(dataset_gen.train_base.cats),
-                            head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'])
+            model = Model(config, n_base_classes=len(dataset_gen.train_base.cats))
             model = model.to(device)
 
-            # TODO: change log_freq
-            wandb.watch(model, log='all', log_freq=10)
+            wandb.watch(model, log='all', log_freq=config['debug']['wandb_watch_model_freq'])
 
             # Use the dataset generator to generate the base set
             dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
-                conf['training']['batch_size'], conf['training']['num_workers'],
-                conf['training']['pin_memory'], conf['training']['drop_last'], shuffle=True
+                config['training']['batch_size'], config['training']['num_workers'],
+                config['training']['pin_memory'], config['training']['drop_last'], 
+                shuffle=True
             )
 
             if debug_mode:
                 print("Dataset base train length: ", len(dataset_base_train))
-                # sample, landmarks, original_image_size = dataset_base_train[0]
-                # use "show_images.py" functions to show the sample / samples
+            #     # sample, landmarks, original_image_size = dataset_base_train[0]
+            #     # use "show_images.py" functions to show the sample / samples
 
-            optimizer_base = Adam(model.parameters(), 
-                                lr=conf['training']['base']['lr'])
+            optimizer_base = Adam([
+                    {'params': model.encoder.parameters(), 'lr': config['training']['base']['encoder_lr']},
+                    {'params': [t for k, t in model.named_parameters() if 'encoder' not in k]}
+                ], 
+                lr=config['training']['base']['lr'],
+                weight_decay=config['training']['base']['weight_decay'])
+
+            scheduler_base = T.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer_base, patience=config['training']['base']['reduce_lr_patience']
+            )
         
             # Train the base model and save final weights
             model = train_loop( model,
-                                conf,
+                                config,
                                 training_loader=dataset_base_train,
                                 validation_loader=dataset_base_val,
                                 optimizer=optimizer_base,
-                                device=device,
-                                name="standard_model_base")
+                                scheduler=scheduler_base,
+                                device=device)
             
+            # Evaluation on base train dataset
+            metrics = Evaluate(
+                model, 
+                dataset_base_train, 
+                prefix="train/",
+                device=device,
+                config=config
+            )(is_novel=False)
             # Evaluation also on base test dataset
-            metrics_base_test = Evaluate(
+            metrics_test = Evaluate(
                 model, 
                 dataset_base_test, 
                 prefix="test/",
                 device=device,
-                conf=conf
-            )()
-        
-            with open(os.path.join(conf['training']['save_training_info_dir'], 'base_training_info.pkl'), 'wb') as f:
-                pickle.dump(metrics_base_test, f)
+                config=config
+            )(is_novel=False)
+            metrics.update(metrics_test)
+
+            # TODO: add timestamp so that it doesn't overwrite the same metrics over and over
+            with open(os.path.join(config['training']['save_training_info_dir'], 
+                                   config['training']['base_stats_save_name']), 'wb') as f:
+                pickle.dump(metrics, f)
 
     ## NOVEL TRAININGS ##
-
-    if conf['training']['train_novel']:
+    if config['training']['train_novel']:
         
-        metrics_novel_list = {k: [] for k in conf['data']['K']}
+        metrics_novel_list = {k: [] for k in K}
         # TODO: Maybe it's better to evaluate on full in another script
         # metrics_full_list  = {k: [] for k in conf['data']['K']}
 
@@ -136,60 +140,65 @@ def main(args):
             test_K = [test_K[0]] * n_repeats_novel_train
 
         # Instantiate the model (also the novel part)
-        model = Model(  encoder_name = conf['model']['encoder_name'], 
+        model = Model(  config=config, 
                         n_base_classes = len(dataset_gen.train_base.cats),
-                        head_base_heatmap_mode = conf['model']['head_base_heatmap_mode'],
-                        n_novel_classes=conf['data']['novel_classes_to_sample'],
-                        head_novel_heatmap_mode = conf['model']['head_novel_heatmap_mode'])
-
+                        n_novel_classes=config['data']['novel_classes_to_sample'])
 
         # START TRAINING!
         total_trainings = len(K) * n_repeats_novel_train
-
-        for i in tqdm(range(total_trainings), desc="Novel trainings"):
+        for i in tqdm(range(total_trainings), position=0, desc="Novel trainings: ", leave=True):
 
             with wandb.init(project="FSOD_CenterNet", 
                             group="novel_training",
-                            config=conf):
-                
-                print(f"\nTraining on novel dataset: {i}/{total_trainings}")
+                            config=config):
 
                 current_train_K = K[i % n_repeats_novel_train]
                 current_val_K   = val_K[i % n_repeats_novel_train]
                 current_test_K  = test_K[i % n_repeats_novel_train]
 
                 # Reload weights from base training + freeze base part
-                model = set_model_to_train_novel(model, conf)
+                model = set_model_to_train_novel(model, config)
                 model = model.to(device)
 
                 # Optimizer
-                optimizer_novel = Adam(model.parameters(), lr=conf['training']['novel']['lr'])
+                optimizer_novel = Adam(model.parameters(), 
+                                       lr=config['training']['novel']['lr'],
+                                       weight_decay=config['training']['novel']['weight_decay'])
+
+                scheduler_novel = T.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer_novel, patience=config['training']['novel']['reduce_lr_patience']
+                )
 
                 # Obtain dataset from generator
                 # Use the dataset generator to generate the base set
                 _, (dataset_novel_train, dataset_novel_val, dataset_novel_test) = \
                     dataset_gen.generate_dataloaders(
                         K=current_train_K, val_K=current_val_K, test_K=current_test_K,
-                        num_novel_classes_to_sample=conf['data']['novel_classes_to_sample'],
-                        novel_classes_to_sample_list=conf['data']['novel_classes_list'],
-                        gen_random_seed=conf['data']['gen_random_seed'],
-                        batch_size=conf['training']['batch_size'],
-                        num_workers=conf['training']['num_workers'],
-                        pin_memory=conf['training']['pin_memory'],
-                        drop_last=conf['training']['drop_last'],
+                        num_novel_classes_to_sample=config['data']['novel_classes_to_sample'],
+                        novel_classes_to_sample_list=config['data']['novel_classes_list'],
+                        gen_random_seed=config['data']['gen_random_seed'],
+                        batch_size=config['training']['batch_size'],
+                        num_workers=config['training']['num_workers'],
+                        pin_memory=config['training']['pin_memory'],
+                        drop_last=config['training']['drop_last'],
                         shuffle=True
                     )
 
                 model = train_loop(model,
-                                epochs=conf['training']['novel']['epochs'],
-                                training_loader=dataset_novel_train,
-                                validation_loader=dataset_novel_val,
-                                optimizer=optimizer_novel,
-                                weights_path=conf['training']['save_novel_weights_dir'],
-                                novel_training=True)
+                    config=config,
+                    training_loader=dataset_novel_train,
+                    validation_loader=dataset_novel_val,
+                    optimizer=optimizer_novel,
+                    scheduler=scheduler_novel,
+                    device=device,
+                    novel_training=True)
                 
+                wandb.watch(model, log='all', log_freq=config['debug']['wandb_watch_model_freq'])
+
                 # Evaluation on novel_dataset
-                metrics_novel = Evaluate(model, dataset_novel_test)
+                metrics_novel = Evaluate(model, dataset_novel_train, device, config, prefix="train/")(is_novel=True)
+                m = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
+                metrics_novel.update(m)
                 metrics_novel_list[current_train_K].append(metrics_novel)
 
                 # TODO: merge the two datasets
@@ -198,13 +207,14 @@ def main(args):
                 # Evaluation on full dataset
                 # metrics_full = Evaluate(model, dataset_full_test)
                 # metrics_full_list[current_train_K].append(metrics_full)
-        
-            with open(os.path.join(conf['training']['save_training_info_dir'], 'novel_training_info.pkl'), 'wb') as f:
+
+            with open(os.path.join(config['training']['save_training_info_dir'], 
+                                   config['training']['novel_stats_save_name']), 'wb') as f:
                 pickle.dump(metrics_novel_list, f)
-            
+
             # with open(os.path.join(conf['training']['save_training_info_dir'], 'full_training_info.pkl'), 'wb') as f:
             #     pickle.dump(metrics_full_list, f)
-    
+
 
 if __name__ == "__main__":
     args = parse_args()

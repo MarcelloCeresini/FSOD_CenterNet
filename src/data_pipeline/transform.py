@@ -2,42 +2,48 @@ from typing import Dict, List, Tuple
 import torch as T
 from torchvision.transforms import ColorJitter, Compose, GaussianBlur
 
-from .dataset_config import DatasetConfig
-from .own_transforms import RandomResizedCropOwn, ResizeOwn, RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, ResizeAndNormalizeLabelsOwn
+from .own_transforms import RandomResizedCropOwn, ResizeOwn, \
+    RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, \
+    ResizeAndNormalizeLabelsOwn
 from .landmarks_to_labels import LandmarksToLabels, LandmarksTransform
 
 
 class TransformTraining:
     def __init__(self,
-                 conf: DatasetConfig = DatasetConfig(),
+                 config: Dict,
                  base_classes: List = [],
                  novel_classes: List = []) -> None:
         
-        self.max_detections = conf.max_detections
+        self.max_detections = config['data']['max_detections']
 
-        self.random_crop = RandomResizedCropOwn(size=conf.input_to_model_resolution,
-                                                scale=conf.crop_scale, # scale of the crop (before resizing) compared to original image
-                                                ratio=conf.crop_ratio) # aspect ratio of the crop (before resizing) compared to original image
+        self.random_crop = RandomResizedCropOwn(
+            size=config['data']['input_to_model_resolution'],
+            scale=config['data']['augmentations']['crop_scale'], # scale of the crop (before resizing) compared to original image
+            ratio=config['data']['augmentations']['crop_ratio']) # aspect ratio of the crop (before resizing) compared to original image
         
-        self.random_vertical_flip = RandomVerticalFlipOwn(p=conf.p_vertical_flip)
+        self.random_vertical_flip = RandomVerticalFlipOwn(
+            p=config['data']['augmentations']['p_vertical_flip'])
 
-        self.random_horizontal_flip = RandomHorizontalFlipOwn(p=conf.p_horizontal_flip)
+        self.random_horizontal_flip = RandomHorizontalFlipOwn(
+            p=config['data']['augmentations']['p_horizontal_flip'])
 
-        # TODO: check parameters and put them in config
-        self.color_jitter = ColorJitter(brightness=0.2, 
-                                        contrast=0.2, 
-                                        saturation=0.2, 
-                                        hue=0.2)
+        self.color_jitter = ColorJitter(
+            brightness=config['data']['augmentations']['brightness_jitter'], 
+            contrast=config['data']['augmentations']['contrast_jitter'], 
+            saturation=config['data']['augmentations']['saturation_jitter'], 
+            hue=config['data']['augmentations']['hue_jitter'])
         
-        sampled_sigma = T.rand(1) * (conf.sgb_lims[1]-conf.sgb_lims[0]) + conf.sgb_lims[0]
+        sampled_sigma = T.rand(1) * \
+            (config['data']['augmentations']['sgb_lims'][1]-config['data']['augmentations']['sgb_lims'][0]) \
+            + config['data']['augmentations']['sgb_lims'][0]
         
         self.gaussian_blur = GaussianBlur(kernel_size=7,
                                           sigma=sampled_sigma.item())
         
         self.normalize = NormalizeOwn()
 
-        self.landmarks_to_labels = LandmarksToLabels(conf, base_classes, novel_classes)
-        self.transform_landmarks = LandmarksTransform(conf)
+        self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
+        self.transform_landmarks = LandmarksTransform(config, base_classes, novel_classes)
  
 
     def __call__(self, 
@@ -60,7 +66,6 @@ class TransformTraining:
                          self.gaussian_blur,
                          self.normalize])(image)
         
-        # TODO: changing here landmarks
         labels = self.landmarks_to_labels(landmarks)
 
         padded_landmarks = self.transform_landmarks(landmarks)
@@ -70,16 +75,16 @@ class TransformTraining:
 
 class TransformTesting:
     def __init__(self,
-                 conf: DatasetConfig = DatasetConfig(),
+                 config: Dict,
                  base_classes: List = [],
                  novel_classes: List = []) -> None:
         
-        self.resize = ResizeOwn(size=conf.input_to_model_resolution) # aspect ratio of the crop (before resizing) compared to original image
+        self.resize = ResizeOwn(size=config['data']['input_to_model_resolution']) 
         
         self.normalize = NormalizeOwn()
 
-        self.landmarks_to_labels = LandmarksToLabels(conf, base_classes, novel_classes)
-        self.transform_landmarks = LandmarksTransform(conf)
+        self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
+        self.transform_landmarks = LandmarksTransform(config, base_classes, novel_classes)
 
 
     def __call__(self, 

@@ -2,15 +2,12 @@ import json
 import os
 import random
 import time
+from tempfile import NamedTemporaryFile
 from typing import Dict, List
-from tempfile import TemporaryFile
-
-from tqdm import tqdm
-
-from torch.utils.data import Dataset, DataLoader
-from torchvision.io import read_image, ImageReadMode
 
 from pycocotools.coco import COCO
+from torch.utils.data import DataLoader, Dataset
+from torchvision.io import ImageReadMode, read_image
 
 from .transform import TransformTesting, TransformTraining
 
@@ -71,36 +68,27 @@ class DatasetFromCocoAnnotations(Dataset):
 
 class DatasetsGenerator():
 
-    def __init__(self, 
-            annotations_path: str,
-            images_dir: str, 
-            novel_class_ids_path: str,
-            train_set_path: str,
-            val_set_path: str,
-            test_set_path: str,
-            use_fixed_novel_sets: bool = False,
-            novel_train_set_path: str | None = None,
-            novel_val_set_path: str | None = None,
-            novel_test_set_path: str | None = None,
-    ) -> None:
-        
-        self.images_dir         = images_dir
+    def __init__(self, config: Dict) -> None:
 
-        self.annotations_path   = annotations_path
-        self.train_set_path     = train_set_path
-        self.val_set_path       = val_set_path
-        self.test_set_path      = test_set_path
+        self.config             = config
 
-        self.train_base         = COCO(train_set_path)
-        self.val_base           = COCO(val_set_path)
-        self.test_base          = COCO(test_set_path)
+        self.images_dir         = self.config['paths']['images_dir']
 
-        self.use_fixed_novel_sets   = use_fixed_novel_sets
-        self.novel_train_set_path   = novel_train_set_path
-        self.novel_val_set_path     = novel_val_set_path
-        self.novel_test_set_path    = novel_test_set_path
+        self.annotations_path   = self.config['paths']['annotations_path']
+        self.train_set_path     = self.config['paths']['train_base_annotations_path']
+        self.val_set_path       = self.config['paths']['val_base_annotations_path']
+        self.test_set_path      = self.config['paths']['test_base_annotations_path']
 
-        self.novel_class_ids_path   = novel_class_ids_path
+        self.train_base         = COCO(self.train_set_path)
+        self.val_base           = COCO(self.val_set_path)
+        self.test_base          = COCO(self.test_set_path)
+
+        self.use_fixed_novel_sets   = self.config['data']['use_fixed_sets']
+        self.novel_train_set_path   = self.config['paths']['train_novel_annotations_path']
+        self.novel_val_set_path     = self.config['paths']['val_novel_annotations_path']
+        self.novel_test_set_path    = self.config['paths']['test_novel_annotations_path']
+
+        self.novel_class_ids_path   = self.config['paths']['novel_classes_ids_path']
 
         # Check if we should select a new split of the set or use the given ones
         if self.use_fixed_novel_sets:
@@ -150,9 +138,11 @@ class DatasetsGenerator():
                 raise FileNotFoundError('Default novel set not found.')
             
         novel_set = self.convert_k_shot_algo_to_coco(annots, self.full_annotations)
-        with TemporaryFile('w+') as fp:
-            json.dump(novel_set, fp)
-            return COCO(fp.name), annots
+        with NamedTemporaryFile('w+') as fp:
+            json.dump(novel_set, fp)    # Write
+            fp.seek(0)                  # Bring back to start of file
+            coco_dset = COCO(fp.name)   # Read
+        return coco_dset, annots
 
 
     def _generate_new_novel_sets(self, 
@@ -198,18 +188,21 @@ class DatasetsGenerator():
 
 
     def get_base_sets(self):
-        # TODO: validation should have TransformTraining or TransformTesting?
+        # Validation should have TransformTraining or TransformTesting?
         # ANSWER: Training because it needs labels to compute the loss
         return (
             DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
+                self.config,
                 base_classes=list(self.train_base.cats),
                 novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else []
             )),
             DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining(
+                self.config,
                 base_classes=list(self.val_base.cats),
                 novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else []
             )),
             DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting(
+                self.config,
                 base_classes=list(self.test_base.cats),
                 novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else []
             ))
@@ -239,14 +232,17 @@ class DatasetsGenerator():
                                       novel_classes_to_sample_list, random_seed)
         return self.get_base_sets(), (
                 DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformTraining(
+                self.config,
                 base_classes=list(self.train_base.cats),
                 novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else novel_classes_to_sample_list
             )),
                 DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformTraining(
+                self.config,
                 base_classes=list(self.val_base.cats),
                 novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
             )),
                 DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting(
+                self.config,
                 base_classes=list(self.test_base.cats),
                 novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
             ))
@@ -329,7 +325,7 @@ class DatasetsGenerator():
             annots = {class_id: [] for class_id in novel_classes}
             
             # Step 2): Constructively add images to our annotation pool
-            for class_id in tqdm(novel_classes):
+            for class_id in novel_classes:
                 
                 # Get the images containing annotations of that class and randomize them
                 class_image_ids = coco_dset.getImgIds(catIds=[class_id])
@@ -404,10 +400,10 @@ class DatasetsGenerator():
         novel_categories = set(k_shot_anns.keys())
         # Copy values from the full annotation set but only for the chosen ids
         coco_anns = {
-            'info': full_anns['info'],
-            'licenses': full_anns['licenses'],
-            'categories': [c for c in full_anns['categories'] if c['id'] in novel_categories],
-            'images': [im for im in full_anns['images'] if im['id'] in k_shot_img_ids],
-            'annotations': [an for an in full_anns['annotations'] if an['id'] in k_shot_ann_ids]
+            "info": full_anns['info'],
+            "licenses": full_anns['licenses'],
+            "categories": [c for c in full_anns['categories'] if c['id'] in novel_categories],
+            "images": [im for im in full_anns['images'] if im['id'] in k_shot_img_ids],
+            "annotations": [an for an in full_anns['annotations'] if an['id'] in k_shot_ann_ids]
         }
         return coco_anns

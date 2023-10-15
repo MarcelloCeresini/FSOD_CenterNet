@@ -15,13 +15,14 @@ from evaluation import Evaluate
 # - save best model
 # - log to w&b
 
-def set_model_to_train_novel(model: Model, conf: Dict):
+def set_model_to_train_novel(model: Model, config: Dict):
     '''
     Loads the correct weights and sets the model to train the novel head only
     '''
     # Load the weights from the base training
     model.load_state_dict(
-        T.load(conf['training']['save_base_weights_dir'] + 'best_base.pt', map_location='cpu'),
+        T.load(config['training']['save_base_weights_dir'] + config['training']['base_weights_load_name'], 
+               map_location='cpu'),
         strict=False
     )
 
@@ -39,117 +40,106 @@ def set_model_to_train_novel(model: Model, conf: Dict):
 
 
 def train_loop(model,
-               conf,
+               config,
                training_loader,
                validation_loader,
                optimizer,
+               scheduler,
                device,
-               name="standard_model",
                novel_training=False):
     
     train_group = 'base' if not novel_training else 'novel'
-    epochs = conf['training'][train_group]['epochs']
-    weights_path = conf['training']['save_base_weights_dir']
-    epoch_metric_log_interval = conf['training'][train_group]['epoch_metric_log_interval']
+    epochs = config['training'][train_group]['epochs']
+    weights_path = config['training']['save_base_weights_dir']
+    epoch_metric_log_interval = config['training'][train_group]['epoch_metric_log_interval']
     
-    print("####################")
-    print(f"Started {'base' if not novel_training else 'novel'} training")
-    print("####################")
+    # print("####################")
+    # print(f"Started {'base' if not novel_training else 'novel'} training")
+    # print("####################")
 
     best_vloss = 1e10
+    batch_count = 0
 
-    for epoch in range(epochs):
-        print('EPOCH {}:'.format(epoch + 1))
+    for epoch in tqdm(range(epochs), 
+                      desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
+                      position=0 + int(novel_training),
+                      leave=not novel_training):
+        # print('EPOCH {}:'.format(epoch + 1))
 
         # Train for one epoch
-        # TODO: does model.train() unfreeze the base weights while novel training?
-
         model.train()
-        avg_loss = train_one_epoch(model,
-                                   training_loader,
-                                   optimizer,
-                                   device,
-                                   novel_training=novel_training)
-        
+        avg_loss, batch_count = train_one_epoch(model,
+                                                config,
+                                                training_loader,
+                                                optimizer,
+                                                device,
+                                                novel_training=novel_training,
+                                                batch_count=batch_count)
+
         # Validate
         running_vloss = 0.0
-        
+
         model.eval()
         with T.no_grad():
-            for i, (input_image, labels, n_detections, padded_landmarks) in tqdm(enumerate(validation_loader), 
-                                                                                 total=len(validation_loader),
-                                                                                 desc="Validation "+ ("base" if not novel_training else "novel")):
+            for i, (input_image, labels, n_detections, _) in tqdm(enumerate(validation_loader), 
+                    total=len(validation_loader), position=1 + int(novel_training), leave=False,
+                    desc="Validation: "):
                 
                 gt_reg, gt_heat_base, gt_heat_novel = labels
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
 
                 if novel_training:
                     vloss = T.mean(heatmap_loss(pred_heat_novel,
-                                                        gt_heat_novel,
-                                                        n_detections),
+                                                gt_heat_novel,
+                                                n_detections,
+                                                config),
                                    dim=0)
-                
                 else:
                     vloss = T.mean(heatmap_loss(pred_heat_base,
-                                                        gt_heat_base,
-                                                        n_detections),
+                                                gt_heat_base,
+                                                n_detections,
+                                                config),
                                 dim=0)
-            
+
                 vloss += T.mean(reg_loss(pred_reg,
                                          gt_reg,
-                                         n_detections),
+                                         n_detections,
+                                         config),
                                 dim=0)
-                
-                running_vloss += vloss
 
-                # TODO: THIS IS ONLY FOR TESTING
-                if i > 2:
-                    break
+                running_vloss += vloss
 
         avg_vloss = running_vloss.item() / (i + 1)
 
-        print('LOSS train {} - valid {}'.format(avg_loss, avg_vloss))
-
         log_dict = {
             "epoch": epoch, 
-            "loss": avg_loss,
-            "val_loss": avg_vloss
+            "train/avg_loss": avg_loss,
+            "val/avg_loss": avg_vloss
         }
 
         if epoch % epoch_metric_log_interval == 0:
-            # Evaluation on base test dataset
-            metrics_training = Evaluate(
-                model, 
-                training_loader, 
-                prefix="train/",
-                device=device,
-                conf=conf
-            )()
             metrics_validation = Evaluate(
                 model, 
                 validation_loader, 
                 prefix="val/",
                 device=device,
-                conf=conf
-            )()
-
-            log_dict.update(metrics_training)
+                config=config
+            )(is_novel=novel_training)
             log_dict.update(metrics_validation)
 
         wandb.log(log_dict)
 
+        # LR Scheduling
+        scheduler.step(avg_vloss)
+
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
-            patience_counter = 0
             best_vloss = avg_vloss
 
             if not novel_training:
                 os.makedirs(weights_path, exist_ok=True)
-                model_path = os.path.join(weights_path, 'best_base.pt')
+                model_path = os.path.join(weights_path, 
+                                          config['training']['base_weights_save_name'])
                 T.save(model.state_dict(), model_path)
-
-        else:
-            # TODO: implement patience and/or reduce learning rate on plateau
-            patience_counter += 1
 
     return model
