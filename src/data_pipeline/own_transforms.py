@@ -8,24 +8,20 @@ class RandomResizedCropOwn():
                  size, 
                  scale, 
                  ratio) -> None:
-        
+
         self.size = size
         self.scale = scale
         self.ratio = ratio
-
-        self.random_resize_crop = RandomResizedCrop(size=self.size,
-                                                    scale=self.scale,
-                                                    ratio=self.ratio)
 
     def __call__(self, sample):
 
         image, landmarks = sample["image"], sample["landmarks"]
 
         accepted = []
+        scale, ratio = self.scale, self.ratio
+        # Repeat until we find at least one bbox that is accepted
         while len(accepted) < 1:
-            top, left, h, w = self.random_resize_crop.get_params(image, 
-                                                            self.scale, 
-                                                            self.ratio)
+            top, left, h, w = RandomResizedCrop.get_params(image, scale, ratio)
 
             # TODO: is it ok if we accept bboxes ONLY IF THEIR CENTER IS IN THE CROP? 
             # TODO: do we need some stats to understand how many we reject?
@@ -40,6 +36,13 @@ class RandomResizedCropOwn():
                 if (left <= l["center_point"][0] < left + w) \
                     and (top <= l["center_point"][1] < top + h)
             ]
+            # If no bbox is accepted, increase range for scale and ratio (-10%,+30%)
+            if len(accepted) < 1:
+                scale[0] *= 0.9
+                scale[1] *= 1.3
+                ratio[0] *= 0.9
+                ratio[1] *= 1.3
+
 
         image = F.resized_crop(image,
                             top, left, h, w, 
