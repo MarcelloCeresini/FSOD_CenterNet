@@ -33,12 +33,7 @@ class TransformTraining:
             saturation=config['data']['augmentations']['saturation_jitter'], 
             hue=config['data']['augmentations']['hue_jitter'])
         
-        sampled_sigma = T.rand(1) * \
-            (config['data']['augmentations']['sgb_lims'][1]-config['data']['augmentations']['sgb_lims'][0]) \
-            + config['data']['augmentations']['sgb_lims'][0]
-        
-        self.gaussian_blur = GaussianBlur(kernel_size=7,
-                                          sigma=sampled_sigma.item())
+        self.gaussian_blur_sigma_interval = config['data']['augmentations']['sgb_lims']
         
         self.normalize = NormalizeOwn()
 
@@ -54,6 +49,8 @@ class TransformTraining:
             landmarks: useful for visualization
             original_sample: useful for visualization
         '''
+        
+
         transformed_sample = Compose([self.random_crop,
                                       self.random_vertical_flip,
                                       self.random_horizontal_flip])(original_sample)
@@ -61,9 +58,12 @@ class TransformTraining:
         image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
 
         n_landmarks = len(landmarks)
-
+        
+        gaussian_blur = GaussianBlur(kernel_size=7,
+                                     sigma=self.gaussian_blur_sigma_interval)
+        
         image = Compose([self.color_jitter,
-                         self.gaussian_blur,
+                         gaussian_blur,
                          self.normalize])(image)
         
         labels = self.landmarks_to_labels(landmarks)

@@ -1,6 +1,6 @@
 from torch.nn import Module
 from torchvision.ops import DeformConv2d
-from torch.nn import ConvTranspose2d, Conv2d
+from torch.nn import ConvTranspose2d, Conv2d, ReLU
 
 from .deformable_conv_2d import DeformableConv2d
 
@@ -39,12 +39,22 @@ class Neck(Module):
         self.upsample2 = Upsample(int(in_channels/2))
         self.upsample3 = Upsample(int(in_channels/4))
 
+        self.activation1 = ReLU()
+        self.activation2 = ReLU()
+        self.activation3 = ReLU()
+
         self.out_channels = self.upsample3.out_channels
 
     def forward(self, x):
         x = self.upsample1(x)
+        x = self.activation1(x)
+
         x = self.upsample2(x)
+        x = self.activation2(x)
+
         x = self.upsample3(x)
+        x = self.activation3(x)
+        
         return x
     
 
