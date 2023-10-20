@@ -60,7 +60,7 @@ data:
     crop_ratio: [0.5, 1.5]
     p_vertical_flip: 0.5
     p_horizontal_flip: 0.5
-    sgb_lims: [0.001, 2.0]
+    sgb_lims: (0.001, 2.0)
     brightness_jitter: 0.2
     contrast_jitter: 0.2
     saturation_jitter: 0.2
