@@ -36,8 +36,8 @@ training:
   
   loss_clip_norm: 1.0
 
-  batch_size: 4
-  num_workers: 2
+  batch_size: 32
+  num_workers: 8
   pin_memory: True
   drop_last: False
 
@@ -60,7 +60,7 @@ data:
     crop_ratio: [0.5, 1.5]
     p_vertical_flip: 0.5
     p_horizontal_flip: 0.5
-    sgb_lims: (0.001, 2.0)
+    sgb_lims: [0.001, 2.0]
     brightness_jitter: 0.2
     contrast_jitter: 0.2
     saturation_jitter: 0.2
@@ -99,9 +99,9 @@ paths:
   annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
   novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
   
-  train_base_annotations_path: ../data/base_dset/small_base_train.json   # The base train set
-  val_base_annotations_path  : ../data/base_dset/small_base_val.json     # The base validation set
-  test_base_annotations_path : ../data/base_dset/small_base_test.json    # The base test set
+  train_base_annotations_path: ../data/base_dset/base_train.json   # The base train set
+  val_base_annotations_path  : ../data/base_dset/base_val.json     # The base validation set
+  test_base_annotations_path : ../data/base_dset/base_test.json    # The base test set
   
   train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
   val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set

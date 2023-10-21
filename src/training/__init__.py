@@ -64,7 +64,6 @@ def train_loop(model,
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
                       position=0 + int(novel_training),
                       leave=not novel_training):
-        # print('EPOCH {}:'.format(epoch + 1))
 
         # Train for one epoch
         model.train()

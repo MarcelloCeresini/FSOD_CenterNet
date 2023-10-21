@@ -1,10 +1,9 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import torch as T
 from torchvision.transforms import ColorJitter, Compose, GaussianBlur
 
 from .own_transforms import RandomResizedCropOwn, ResizeOwn, \
-    RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn, \
-    ResizeAndNormalizeLabelsOwn
+    RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn
 from .landmarks_to_labels import LandmarksToLabels, LandmarksTransform
 
 
@@ -58,14 +57,14 @@ class TransformTraining:
         image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
 
         n_landmarks = len(landmarks)
-        
+
         gaussian_blur = GaussianBlur(kernel_size=7,
                                      sigma=self.gaussian_blur_sigma_interval)
-        
+
         image = Compose([self.color_jitter,
                          gaussian_blur,
                          self.normalize])(image)
-        
+
         labels = self.landmarks_to_labels(landmarks)
 
         padded_landmarks = self.transform_landmarks(landmarks)
@@ -80,7 +79,7 @@ class TransformTesting:
                  novel_classes: List = []) -> None:
         
         self.resize = ResizeOwn(size=config['data']['input_to_model_resolution']) 
-        
+
         self.normalize = NormalizeOwn()
 
         self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
