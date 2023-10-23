@@ -1,3 +1,6 @@
+DEBUG_EVALUATE = True
+
+
 import torch as T
 import torch.nn.functional as NNF
 from torchmetrics.detection import MeanAveragePrecision
@@ -160,7 +163,11 @@ class Evaluate:
                     "labels": padded_landmarks["labels"][i,:n_landmarks]
                 }
 
-                pred_batch.append(landmarks_pred)
+                if DEBUG_EVALUATE:
+                    pred_batch.append(landmarks_gt)
+                else:
+                    pred_batch.append(landmarks_pred)
+                
                 gt_batch.append(landmarks_gt)
 
             self.metric.update(
