@@ -1,4 +1,4 @@
-DEBUG_EVALUATE = True
+DEBUG_EVALUATE = False
 
 
 import torch as T
@@ -45,7 +45,8 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
-        self.metric = MeanAveragePrecision(box_format="cxcywh")
+        self.metric = MeanAveragePrecision(box_format="cxcywh",
+                                           class_metrics=True)
 
     @T.no_grad()
     def get_heatmap_maxima_idxs(self, 
@@ -164,19 +165,25 @@ class Evaluate:
                 }
 
                 if DEBUG_EVALUATE:
-                    pred_batch.append(landmarks_gt)
-                else:
-                    pred_batch.append(landmarks_pred)
-                
+                    for i in range(n_landmarks):
+                        j = T.randint(len(landmarks_pred["scores"]), ()).item()
+                        landmarks_pred["boxes"][j, :] = T.tensor([x.item()*1.1 for x in landmarks_gt["boxes"][i,:]])
+                        landmarks_pred["labels"][j] = landmarks_gt["labels"][i] if T.randint(2,()).item() else landmarks_gt["labels"][i]+1
+
+
+                pred_batch.append(landmarks_pred)
                 gt_batch.append(landmarks_gt)
 
-            self.metric.update(
+            current_metric = self.metric(
                 preds=pred_batch, 
                 target=gt_batch
             )
 
-        result = {
+            pass
+
+        complete_metric = self.metric.compute()
+
+        return {
             self.prefix + k: v
-            for k, v in self.metric.compute().items()
+            for k, v in complete_metric.items()
         }
-        return result

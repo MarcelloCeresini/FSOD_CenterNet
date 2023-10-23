@@ -1,4 +1,4 @@
-DEBUG_EVALUATE = True
+DEBUG_EVALUATE = False
 
 
 import argparse
