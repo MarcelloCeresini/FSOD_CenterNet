@@ -10,7 +10,7 @@ def heatmap_loss(pred_heatmap, gt_heatmap, num_keypoints, config):
         (1 - pred_heatmap) ** config['model']['alpha_loss'] * T.log(pred_heatmap),
         (1 - gt_heatmap) ** config['model']['beta_loss'] * \
             (pred_heatmap) ** config['model']['alpha_loss'] * T.log(1 - pred_heatmap),
-    ).reshape(pred_heatmap.shape[0], -1).mean(dim=-1)
+    ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
 
     result = T.where(
         num_keypoints != 0,
