@@ -1,6 +1,6 @@
 from typing import Dict, List
 import torch as T
-from torchvision.transforms import ColorJitter, Compose, GaussianBlur
+from torchvision.transforms import ColorJitter, Compose, GaussianBlur, Normalize
 
 from .own_transforms import RandomResizedCropOwn, ResizeOwn, \
     RandomVerticalFlipOwn, RandomHorizontalFlipOwn, NormalizeOwn
@@ -35,6 +35,7 @@ class TransformTraining:
         self.gaussian_blur_sigma_interval = config['data']['augmentations']['sgb_lims']
         
         self.normalize = NormalizeOwn()
+        self.normalize_mean_std = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
         self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
         self.transform_landmarks = LandmarksTransform(config, base_classes, novel_classes)
@@ -63,7 +64,8 @@ class TransformTraining:
 
         image = Compose([self.color_jitter,
                          gaussian_blur,
-                         self.normalize])(image)
+                         self.normalize,
+                         self.normalize_mean_std])(image)
 
         labels = self.landmarks_to_labels(landmarks)
 
@@ -81,6 +83,7 @@ class TransformTesting:
         self.resize = ResizeOwn(size=config['data']['input_to_model_resolution']) 
 
         self.normalize = NormalizeOwn()
+        self.normalize_mean_std = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
         self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
         self.transform_landmarks = LandmarksTransform(config, base_classes, novel_classes)
@@ -99,6 +102,7 @@ class TransformTesting:
         image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
 
         image = self.normalize(image)
+        image = self.normalize_mean_std(image)
 
         n_landmarks = len(landmarks)
 

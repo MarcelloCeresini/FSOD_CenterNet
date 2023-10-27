@@ -1,6 +1,7 @@
 # Folders
 data
 src/wandb
+cluster_tests
 
 ### STANDARD GITHUB PYTHON STUFF
 

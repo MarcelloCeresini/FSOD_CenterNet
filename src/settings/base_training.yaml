@@ -1,0 +1,114 @@
+# Model parameters:
+model:
+  encoder_name: resnet18
+  head_base_heatmap_mode: CosHead
+  head_novel_heatmap_mode: AdaptiveCosHead
+
+  head_regressor_latent_dim: 64     # output dimension of the first 3x3 convolution in the regressor head
+  head_heatmap_latent_dim: 64       # output dimension of the first 3x3 convolution in the heatmap head
+  range_extender_cos_head: 10.0     # Fixed to 10. by the paper
+  alpha_loss: 2                     # TODO: should be hyperparameter of focal loss
+  beta_loss: 4                      # TODO: should be hyperparameter of focal loss
+  lambda_size_loss: 0.1
+  lambda_offset_loss: 1.0
+
+training:
+  no_overwrite: False               #TODO: put it to True once base training is done
+
+  train_base: True
+  train_novel: False
+  repeat_novel_training: 2
+
+  base:
+    lr: 0.001
+    encoder_lr: 0.0001
+    reduce_lr_patience: 8
+    weight_decay: 0.0001
+    epochs: 100
+    epoch_metric_log_interval: 2
+
+  novel:
+    lr: 0.0001
+    reduce_lr_patience: 5
+    weight_decay: 0.0001
+    epochs: 5
+    epoch_metric_log_interval: 1
+  
+  loss_clip_norm: 1.0
+
+  batch_size: 16
+  num_workers: 4
+  pin_memory: True
+  drop_last: False
+
+  save_base_weights_dir: ../data/weights/base/
+  save_novel_weights_dir: ../data/weights/novel/
+  save_training_info_dir: ../data/training_info/
+
+  base_weights_save_name: best_model.pt
+  base_weights_load_name: best_model.pt
+  base_stats_save_name: base_training_info.pkl
+  novel_stats_save_name: novel_training_info.pkl
+
+# Dataset parameters
+data:
+  input_to_model_resolution: [128, 128]
+  output_stride: [4, 4]
+
+  augmentations:
+    crop_scale: [0.5, 1.0]
+    crop_ratio: [0.5, 1.5]
+    p_vertical_flip: 0.5
+    p_horizontal_flip: 0.5
+    sgb_lims: [0.001, 2.0]
+    brightness_jitter: 0.2
+    contrast_jitter: 0.2
+    saturation_jitter: 0.2
+    hue_jitter: 0.1
+
+  min_IoU_for_gaussian_radius: 0.8
+  max_detections: 100
+
+  gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
+                                        # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
+
+  novel_classes_to_sample: 10           # If None, the novel_class_list will be used instead.
+                                        # If both are none, all novel classes will be used. 
+                                        # Otherwise, the number of novel classes to sample.
+
+  novel_classes_list: null              # If novel_classes_to_sample is null, this should be a list of 
+                                        # novel classes that we want to use. If both are null,
+                                        # all novel classes are used
+
+  use_fixed_sets: False                 # It's assumed that the JSON at train_annotations_path and val_annotations_path 
+                                        # are the original ones. This option can be set True for efficiency: 
+                                        # we can instead pass two pre-made train and validation sets + a novel train
+                                        # and a novel val sets that will directly be used.
+
+  K: [5,10]                                 # The number of few shots for the novel classes. Can also be a list: in that case
+                                        # experiments will be repeated |K| times.
+  
+  val_K: [15,20]                             # The number of few shots for the novel classes in the val dataset. 
+                                        # Can also be a list: in that case experiments will be repeated |K| times.
+
+  test_K: [15,20]                            # The number of few shots for the novel classes in the test dataset. 
+                                        # Can also be a list: in that case experiments will be repeated |K| times.
+
+paths:
+  images_dir: ../data                                         # Base folder for image paths
+  annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
+  novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
+  
+  train_base_annotations_path: ../data/base_dset/base_train.json   # The base train set
+  val_base_annotations_path  : ../data/base_dset/base_val.json     # The base validation set
+  test_base_annotations_path : ../data/base_dset/base_test.json    # The base test set
+  
+  train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
+  val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set
+  test_novel_annotations_path: null                           # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel test set
+
+debug:
+  debug_mode_active: True
+  wandb_watch_model_freq: 100
+
+device: cuda       # "cpu" or "cuda"
