@@ -1,3 +1,6 @@
+DEBUG_EVALUATE = False
+
+
 import argparse
 import os
 import pickle
@@ -88,13 +91,14 @@ def main(args):
             )
         
             # Train the base model and save final weights
-            model = train_loop( model,
-                                config,
-                                training_loader=dataset_base_train,
-                                validation_loader=dataset_base_val,
-                                optimizer=optimizer_base,
-                                scheduler=scheduler_base,
-                                device=device)
+            if not DEBUG_EVALUATE:
+                model = train_loop( model,
+                                    config,
+                                    training_loader=dataset_base_train,
+                                    validation_loader=dataset_base_val,
+                                    optimizer=optimizer_base,
+                                    scheduler=scheduler_base,
+                                    device=device)
             
             # Evaluation on base train dataset
             metrics = Evaluate(
@@ -112,6 +116,7 @@ def main(args):
                 device=device,
                 config=config
             )(is_novel=False)
+            # add to the "metrics" dict also the info over the test set, to dump it together
             metrics.update(metrics_test)
 
             # TODO: add timestamp so that it doesn't overwrite the same metrics over and over
