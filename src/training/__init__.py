@@ -88,32 +88,34 @@ def train_loop(model,
                 pred_reg, pred_heat_base, pred_heat_novel = model(input_image.to(device))
 
                 if novel_training:
-                    vloss = T.mean(heatmap_loss(pred_heat_novel,
+                    vloss_heat = T.mean(heatmap_loss(pred_heat_novel,
                                                 gt_heat_novel,
                                                 n_detections,
                                                 config),
                                    dim=0)
                 else:
-                    vloss = T.mean(heatmap_loss(pred_heat_base,
+                    vloss_heat = T.mean(heatmap_loss(pred_heat_base,
                                                 gt_heat_base,
                                                 n_detections,
                                                 config),
                                 dim=0)
 
-                vloss += T.mean(reg_loss(pred_reg,
+                vloss_reg = T.mean(reg_loss(pred_reg,
                                          gt_reg,
                                          n_detections,
                                          config),
                                 dim=0)
 
-                running_vloss += vloss
+                running_vloss += (vloss_heat + vloss_reg)
 
         avg_vloss = running_vloss.item() / (i + 1)
 
         log_dict = {
             "epoch": epoch, 
             "train/avg_loss": avg_loss,
-            "val/avg_loss": avg_vloss
+            "val/avg_loss": avg_vloss,
+            "val/heatmap_loss": vloss_heat,
+            "val/reg_loss": vloss_reg
         }
 
         if epoch % epoch_metric_log_interval == 0:
