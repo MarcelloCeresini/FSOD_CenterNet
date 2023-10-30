@@ -47,7 +47,8 @@ def train_one_epoch(model,
         optimizer.step()
         running_loss += loss.item()
 
-        wandb.log({'loss': loss.item(), 'heatmap_loss': loss_1, 'reg_loss': loss_2, 'batch': batch_count + i})
+        if (batch_count + i) % config['training']['base' if not novel_training else 'novel']['train_step_log_interval'] == 0:
+            wandb.log({'loss': loss.item(), 'heatmap_loss': loss_1, 'reg_loss': loss_2, 'batch': batch_count + i})
 
     avg_loss = running_loss / (i + 1)
     return avg_loss, batch_count + i + 1

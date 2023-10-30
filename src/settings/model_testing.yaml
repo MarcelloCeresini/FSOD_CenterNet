@@ -26,6 +26,9 @@ training:
     weight_decay: 0.0001
     epochs: 100
     epoch_metric_log_interval: 2
+    train_step_log_interval: 1000
+    early_stopping_patience: 8
+    early_stopping_min_delta: 0.2
 
   novel:
     lr: 0.0001
@@ -33,6 +36,9 @@ training:
     weight_decay: 0.0001
     epochs: 5
     epoch_metric_log_interval: 1
+    train_step_log_interval: 100
+    early_stopping_patience: 8
+    early_stopping_min_delta: 0.2
   
   loss_clip_norm: 1.0
 

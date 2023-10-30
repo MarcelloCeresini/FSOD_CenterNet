@@ -12,7 +12,7 @@
             "program": "train.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["-sett", "settings/model_testing.yaml"]
+            "args": ["-sett", "settings/model_testing_debug.yaml"]
         }
     ]
 }

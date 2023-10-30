@@ -5,6 +5,7 @@ from tqdm import tqdm
 import wandb
 
 from model import Model
+from training.callbacks import EarlyStopper
 from .train_one_epoch import train_one_epoch
 from .losses import heatmap_loss, reg_loss
 from evaluation import Evaluate
@@ -60,6 +61,11 @@ def train_loop(model,
     best_vloss = 1e10
     batch_count = 0
 
+    early_stopper = EarlyStopper(
+        patience=config['training']['base' if not novel_training else 'novel']['early_stopping_patience'],
+        min_delta=config['training']['base' if not novel_training else 'novel']['early_stopping_min_delta']
+    )
+
     for epoch in tqdm(range(epochs), 
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
                       position=0 + int(novel_training),
@@ -112,6 +118,7 @@ def train_loop(model,
 
         log_dict = {
             "epoch": epoch, 
+            "lr": optimizer.param_groups[0]['lr'],
             "train/avg_loss": avg_loss,
             "val/avg_loss": avg_vloss,
             "val/heatmap_loss": vloss_heat,
@@ -142,5 +149,9 @@ def train_loop(model,
                 model_path = os.path.join(weights_path, 
                                           config['training']['base_weights_save_name'])
                 T.save(model.state_dict(), model_path)
+
+        # Early stopping
+        if early_stopper.early_stop(avg_vloss):
+            break
 
     return model
