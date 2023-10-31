@@ -48,9 +48,7 @@ class DeformableConv2d(nn.Module):
                                       bias=bias)
     
     def forward(self, x):
-        h, w = x.shape[2:]
-        max_offset = max(h, w)/4.
-
+        max_offset = torch.max(torch.tensor(x.shape[2:], device=x.device))/4.
         offset = self.offset_conv(x).clamp(-max_offset, max_offset)
         modulator = 2. * torch.sigmoid(self.modulator_conv(x))
         
