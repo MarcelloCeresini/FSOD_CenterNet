@@ -103,8 +103,8 @@ class LandmarksToLabels:
             offset = [low_res_cp[i] - lr_cp_idx[i]
                       for i in range(len(low_res_cp))]
 
-            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0]
-            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1]
+            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0] / self.output_stride[0]
+            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1] / self.output_stride[1]
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
             regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
