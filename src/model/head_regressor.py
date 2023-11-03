@@ -16,11 +16,22 @@ class HeadRegressor(Module):
                             kernel_size=3,
                             padding=1)
         
-        self.activation = ReLU()
-
         self.conv2 = Conv2d(self.head_regressor_latent_dim, 
+                            self.head_regressor_latent_dim, 
+                            kernel_size=3,
+                            padding=1)
+
+        self.conv3 = Conv2d(self.head_regressor_latent_dim, 
+                            self.head_regressor_latent_dim, 
+                            kernel_size=3,
+                            padding=1)
+
+        self.conv4 = Conv2d(self.head_regressor_latent_dim, 
                             self.out_channels,
                             kernel_size=1)
+
+        self.activation = ReLU()
+
         
         # TODO: do we add an activation? for the size? for the offsets? (paper doesn't mention it)
 
@@ -28,4 +39,8 @@ class HeadRegressor(Module):
         x = self.conv1(x)
         x = self.activation(x)
         x = self.conv2(x)
+        x = self.activation(x)
+        x = self.conv3(x)
+        x = self.activation(x)
+        x = self.conv4(x)
         return x

@@ -18,6 +18,14 @@ class HeadHeatmap(Module):
                             in_channels, 
                             kernel_size=3,
                             padding=1)
+        self.conv2 = Conv2d(in_channels, 
+                            in_channels, 
+                            kernel_size=3,
+                            padding=1)
+        self.conv3 = Conv2d(in_channels, 
+                            in_channels, 
+                            kernel_size=3,
+                            padding=1)
         self.activation1 = ReLU()
         
         if mode == "convolution":
@@ -35,6 +43,10 @@ class HeadHeatmap(Module):
 
     def forward(self, x):
         x = self.conv1(x)
+        x = self.activation1(x)
+        x = self.conv2(x)
+        x = self.activation1(x)
+        x = self.conv3(x)
         x = self.activation1(x)
         x = self.second_block(x)
         x = self.activation2(x)

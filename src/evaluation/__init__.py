@@ -112,10 +112,10 @@ class Evaluate:
         for i, (c, cx, cy, sx, sy, score) in \
             enumerate(zip(category, center_coord_x, center_coord_y, size_x, size_y, confidence_scores)):
 
-                landmarks_pred["boxes"][i,0] = cx
-                landmarks_pred["boxes"][i,1] = cy
-                landmarks_pred["boxes"][i,2] = sx
-                landmarks_pred["boxes"][i,3] = sy
+                landmarks_pred["boxes"][i,0] = cx * self.config['data']['output_stride'][0]
+                landmarks_pred["boxes"][i,1] = cy * self.config['data']['output_stride'][1]
+                landmarks_pred["boxes"][i,2] = sx * self.config['data']['output_stride'][0]
+                landmarks_pred["boxes"][i,3] = sy * self.config['data']['output_stride'][1]
                 landmarks_pred["labels"][i] = c
                 landmarks_pred["scores"][i] = score
 
