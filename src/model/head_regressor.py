@@ -8,6 +8,7 @@ class HeadRegressor(Module):
                  in_channels: int) -> None:
         super().__init__()
 
+        self.less_convs = config['model']['less_convs']
         self.head_regressor_latent_dim = config['model']['head_regressor_latent_dim']
         self.out_channels = 4       # (size_x, size_y, offset_x, offset_y)
 
@@ -15,20 +16,25 @@ class HeadRegressor(Module):
                             self.head_regressor_latent_dim, 
                             kernel_size=3,
                             padding=1)
-        
-        self.conv2 = Conv2d(self.head_regressor_latent_dim, 
-                            self.head_regressor_latent_dim, 
-                            kernel_size=3,
-                            padding=1)
 
-        self.conv3 = Conv2d(self.head_regressor_latent_dim, 
-                            self.head_regressor_latent_dim, 
-                            kernel_size=3,
-                            padding=1)
+        if self.less_convs:
+            self.conv2 = Conv2d(self.head_regressor_latent_dim, 
+                                self.out_channels,
+                                kernel_size=1)
+        else:
+            self.conv2 = Conv2d(self.head_regressor_latent_dim, 
+                                self.head_regressor_latent_dim, 
+                                kernel_size=3,
+                                padding=1)
 
-        self.conv4 = Conv2d(self.head_regressor_latent_dim, 
-                            self.out_channels,
-                            kernel_size=1)
+            self.conv3 = Conv2d(self.head_regressor_latent_dim, 
+                                self.head_regressor_latent_dim, 
+                                kernel_size=3,
+                                padding=1)
+
+            self.conv4 = Conv2d(self.head_regressor_latent_dim, 
+                                self.out_channels,
+                                kernel_size=1)
 
         self.activation = ReLU()
 
@@ -39,8 +45,9 @@ class HeadRegressor(Module):
         x = self.conv1(x)
         x = self.activation(x)
         x = self.conv2(x)
-        x = self.activation(x)
-        x = self.conv3(x)
-        x = self.activation(x)
-        x = self.conv4(x)
+        if not self.less_convs:
+            x = self.activation(x)
+            x = self.conv3(x)
+            x = self.activation(x)
+            x = self.conv4(x)
         return x

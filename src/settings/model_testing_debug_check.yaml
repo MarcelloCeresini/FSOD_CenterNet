@@ -1,6 +1,7 @@
 # Model parameters:
 model:
-  encoder_name: resnet18
+  encoder_name: resnet50
+  less_convs: False
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
@@ -42,7 +43,7 @@ training:
   
   loss_clip_norm: 2.0
 
-  batch_size: 4
+  batch_size: 1
   num_workers: 1
   pin_memory: True
   drop_last: False
@@ -58,7 +59,7 @@ training:
 
 # Dataset parameters
 data:
-  input_to_model_resolution: [32, 32]
+  input_to_model_resolution: [288, 288]
   output_stride: [4, 4]
 
   augmentations:

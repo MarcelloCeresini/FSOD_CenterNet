@@ -13,6 +13,15 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["-sett", "settings/model_testing_debug.yaml"]
+        },{
+            "name": "Launch Novel Trainings",
+            "type": "python",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/src",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["-sett", "settings/novel_training_20_classes.yaml"]
         }
     ]
 }

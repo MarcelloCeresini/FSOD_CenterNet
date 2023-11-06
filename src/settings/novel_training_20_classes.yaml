@@ -1,6 +1,7 @@
 # Model parameters:
 model:
   encoder_name: resnet18
+  less_convs: False
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
@@ -48,7 +49,7 @@ training:
   pin_memory: True
   drop_last: False
 
-  save_base_weights_dir: ../data/weights/base/
+  save_base_weights_dir: ../data/weights/from_server/
   save_novel_weights_dir: ../data/weights/novel/
   save_training_info_dir: ../data/training_info/
 
