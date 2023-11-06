@@ -43,6 +43,7 @@ class Evaluate:
         self.device  = device
         self.config  = config
         self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=True)
+        self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
 
     @T.no_grad()
     def get_heatmap_maxima_idxs(self, 
@@ -124,6 +125,9 @@ class Evaluate:
     @T.no_grad()
     def __call__(self, is_novel=False):
 
+        only_classification_metric = dict()
+        thrs = self.config["eval"]["threshold_only_classification_metric"]
+
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
                 enumerate(self.dataset), total=len(self.dataset), position=1 + int(is_novel), 
                 leave=False, desc="Evaluation " + self.prefix):
@@ -137,6 +141,8 @@ class Evaluate:
 
             pred_batch = []
             gt_batch   = []
+            pred_positive_batch = []
+            gt_positive_batch = []
 
             # iteration on batch_size
             for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
@@ -163,13 +169,36 @@ class Evaluate:
                 pred_batch.append(landmarks_pred)
                 gt_batch.append(landmarks_gt)
 
+                landmarks_pred_positive = landmarks_pred.copy()
+                landmarks_gt_positive = landmarks_gt.copy()
+
+                landmarks_pred_positive["labels"] = T.zeros_like(landmarks_pred_positive["labels"])
+                landmarks_gt_positive["labels"] = T.zeros_like(landmarks_gt_positive["labels"])
+                
+                pred_positive_batch.append(landmarks_pred_positive)
+                gt_positive_batch.append(landmarks_gt_positive)
+
             self.metric.update(
                 preds=pred_batch, 
                 target=gt_batch
             )
 
+            self.metric_only_regression.update(
+                preds=pred_positive_batch,
+                target=gt_positive_batch
+            )
+
+    
         result = {
             self.prefix + k: v
             for k, v in self.metric.compute().items()
         }
+
+        result_regression = {
+            self.prefix + "_regression_" + k: v
+            for k, v in self.metric_only_regression.compute().items()
+        }
+
+        result.update(result_regression)
+        
         return result
