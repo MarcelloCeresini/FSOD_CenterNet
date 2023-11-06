@@ -42,7 +42,7 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
-        self.metric = MeanAveragePrecision(box_format="cxcywh")
+        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=True)
 
     @T.no_grad()
     def get_heatmap_maxima_idxs(self, 
