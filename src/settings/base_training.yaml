@@ -1,6 +1,7 @@
 # Model parameters:
 model:
   encoder_name: resnet18
+  less_convs: False
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
