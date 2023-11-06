@@ -22,6 +22,15 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["-sett", "settings/novel_training_20_classes.yaml"]
+        },{
+            "name": "Launch Evaluation",
+            "type": "python",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/src",
+            "program": "final_model_evaluation.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["-Xfrozen_modules=off"]
         }
     ]
 }

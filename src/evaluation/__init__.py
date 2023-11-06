@@ -2,6 +2,7 @@ import torch as T
 import torch.nn.functional as NNF
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
+from torchvision.ops import box_iou, box_convert
 
 class Evaluate:
     '''
@@ -113,10 +114,10 @@ class Evaluate:
         for i, (c, cx, cy, sx, sy, score) in \
             enumerate(zip(category, center_coord_x, center_coord_y, size_x, size_y, confidence_scores)):
 
-                landmarks_pred["boxes"][i,0] = cx * self.config['data']['output_stride'][0]
-                landmarks_pred["boxes"][i,1] = cy * self.config['data']['output_stride'][1]
-                landmarks_pred["boxes"][i,2] = sx * self.config['data']['output_stride'][0]
-                landmarks_pred["boxes"][i,3] = sy * self.config['data']['output_stride'][1]
+                landmarks_pred["boxes"][i,0] = cx
+                landmarks_pred["boxes"][i,1] = cy
+                landmarks_pred["boxes"][i,2] = sx
+                landmarks_pred["boxes"][i,3] = sy
                 landmarks_pred["labels"][i] = c
                 landmarks_pred["scores"][i] = score
 
@@ -125,7 +126,8 @@ class Evaluate:
     @T.no_grad()
     def __call__(self, is_novel=False):
 
-        only_classification_metric = dict()
+        only_classification_metric = 0
+        n=0
         thrs = self.config["eval"]["threshold_only_classification_metric"]
 
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
@@ -178,6 +180,21 @@ class Evaluate:
                 pred_positive_batch.append(landmarks_pred_positive)
                 gt_positive_batch.append(landmarks_gt_positive)
 
+                ious = box_iou(box_convert(landmarks_gt["boxes"], in_fmt="cxcywh", out_fmt="xyxy"),
+                               box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
+                
+                ious_mask = ious >= 0.3
+
+                labels_correct = T.zeros_like(ious)
+                for j, gt_label in enumerate(landmarks_gt["labels"]):
+                    labels_correct[j,:] = landmarks_pred["labels"] == gt_label
+
+                both_correct = T.logical_and(ious_mask, labels_correct)
+                precision = T.sum(both_correct) / T.sum(ious_mask) if T.sum(ious_mask) != 0 else 0
+
+                only_classification_metric = only_classification_metric*n/(n+1) + precision/(n+1)
+                n+=1
+
             self.metric.update(
                 preds=pred_batch, 
                 target=gt_batch
@@ -187,7 +204,6 @@ class Evaluate:
                 preds=pred_positive_batch,
                 target=gt_positive_batch
             )
-
     
         result = {
             self.prefix + k: v
@@ -195,10 +211,11 @@ class Evaluate:
         }
 
         result_regression = {
-            self.prefix + "_regression_" + k: v
+            self.prefix + "regression_" + k: v
             for k, v in self.metric_only_regression.compute().items()
         }
 
         result.update(result_regression)
-        
+        result.update({"classification_precision": only_classification_metric})
+
         return result

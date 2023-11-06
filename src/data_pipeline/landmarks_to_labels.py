@@ -14,9 +14,12 @@ class LandmarksToLabels:
         self.novel_classes          = novel_class_list
 
         # model outputs (out_reg, out_heat_base, out_heat_novel)
+        self.input_resolution       = config['data']['input_to_model_resolution']
         self.output_stride          = config['data']['output_stride']
+
         self.output_resolution      = [x // self.output_stride[i]
-            for i, x in enumerate(config['data']['input_to_model_resolution'])]
+            for i, x in enumerate(self.input_resolution)]
+        
         self.regressor_label_size   = [4, *self.output_resolution]
         self.heatmap_base_size      = [len(self.base_classes), *self.output_resolution]
         self.heatmap_novel_size     = [len(self.novel_classes), *self.output_resolution]
@@ -103,8 +106,8 @@ class LandmarksToLabels:
             offset = [low_res_cp[i] - lr_cp_idx[i]
                       for i in range(len(low_res_cp))]
 
-            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0] / self.output_stride[0]
-            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1] / self.output_stride[1]
+            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0] / self.input_resolution[0]
+            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1] / self.input_resolution[0]
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
             regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
@@ -130,7 +133,8 @@ class LandmarksTransform:
         self.max_detections = config['data']['max_detections']
         self.base_class_list = base_class_list
         self.novel_class_list = novel_class_list
-
+        self.output_stride = config["data"]["output_stride"]
+        self.input_resolution = config['data']['input_to_model_resolution']
     def __call__(self,
              landmarks):
         
@@ -140,10 +144,13 @@ class LandmarksTransform:
         }
 
         for i, l in enumerate(landmarks):
-            padded_landmarks["boxes"][i,0] = l["center_point"][0]
-            padded_landmarks["boxes"][i,1] = l["center_point"][1]
-            padded_landmarks["boxes"][i,2] = l["size"][0]
-            padded_landmarks["boxes"][i,3] = l["size"][1]
+            padded_landmarks["boxes"][i,0] = l["center_point"][0] / self.output_stride[0]
+            padded_landmarks["boxes"][i,1] = l["center_point"][1] / self.output_stride[1]
+            # TODO: decide if we need to normalize
+            # padded_landmarks["boxes"][i,2] = l["size"][0] / self.input_resolution[0]
+            # padded_landmarks["boxes"][i,3] = l["size"][1] / self.input_resolution[1]
+            padded_landmarks["boxes"][i,2] = l["size"][0] / self.output_stride[0]
+            padded_landmarks["boxes"][i,3] = l["size"][1] / self.output_stride[1]
             padded_landmarks["labels"][i]  = self.base_class_list.index(l["category_id"])   \
                 if l['category_id'] in self.base_class_list \
                 else self.novel_class_list.index(l["category_id"]) + len(self.base_class_list)
