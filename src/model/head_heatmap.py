@@ -1,5 +1,5 @@
 from typing import Dict
-from torch.nn import Module, Conv2d, ReLU, Sigmoid
+from torch.nn import Module, Conv2d, ReLU, Sigmoid, Softmax
 
 from .cos_head import CosHead
 
@@ -14,6 +14,7 @@ class HeadHeatmap(Module):
         super().__init__()
 
         self.less_convs = config['model']['less_convs']
+        self.softmax_activation = config["model"]["softmax_activation"]
         self.out_channels = n_classes
         self.conv1 = Conv2d(in_channels, 
                             in_channels, 
@@ -42,8 +43,14 @@ class HeadHeatmap(Module):
             self.second_block = CosHead(config, n_classes, mode="adaptive")
         else:
             raise NotImplementedError("'{}' - this mode is not implemented yet".format(mode))
-
+        
         self.activation2 = Sigmoid()
+
+        if self.softmax_activation:
+            self.pixel_wise_rescaling = Conv2d(in_channels=n_classes,
+                                               out_channels=1,
+                                               kernel_size=1)
+            self.activation3 = Softmax(dim=1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -54,5 +61,11 @@ class HeadHeatmap(Module):
             x = self.conv3(x)
         x = self.activation1(x)
         x = self.second_block(x)
-        x = self.activation2(x)
+        if not self.softmax_activation:
+            x = self.activation2(x)
+        else:
+            y = self.pixel_wise_rescaling(x)
+            y = self.activation2(x)
+            x = self.activation3(x)
+            x = x*y
         return x

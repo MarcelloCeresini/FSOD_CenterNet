@@ -2,6 +2,7 @@
 model:
   encoder_name: resnet18
   less_convs: True
+  softmax_activation: True
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
@@ -43,7 +44,7 @@ training:
   
   loss_clip_norm: 2.0
 
-  batch_size: 1
+  batch_size: 2
   num_workers: 1
   pin_memory: True
   drop_last: False

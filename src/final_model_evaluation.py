@@ -39,7 +39,7 @@ if __name__ == "__main__":
     model = Model(config, n_base_classes=len(dataset_gen.train_base.cats))
 
     model = model.to(device)
-    model.load_state_dict(T.load('../data/weights/from_server/best_model_fix_stoic.pt', map_location="cpu"))
+    # model.load_state_dict(T.load('../data/weights/from_server/best_model_fix_stoic.pt', map_location="cpu"))
 
     # Use the dataset generator to generate the base set
     dataset_base_train, dataset_base_val, dataset_base_test = dataset_gen.get_base_sets_dataloaders(
