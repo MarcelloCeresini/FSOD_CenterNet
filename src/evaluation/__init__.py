@@ -133,7 +133,8 @@ class Evaluate:
         return landmarks
 
     @T.no_grad()
-    def __call__(self, is_novel=False):
+    def __call__(self, is_novel=False, is_full:bool=False):
+        assert not (is_novel and is_full), "is_novel and is_full cannot be both True"
 
         only_classification_metric = 0
         n=0
@@ -147,22 +148,24 @@ class Evaluate:
             reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch = \
                 self.model(image_batch.to(self.device))
 
-            if heat_novel_pred_batch is None:
-                heat_novel_pred_batch = [None] * heat_base_pred_batch.shape[0]
-
             pred_batch = []
             gt_batch   = []
             pred_positive_batch = []
             gt_positive_batch = []
 
-            # iteration on batch_size
-            for i, (reg_pred, heat_base_pred, heat_novel_pred, n_landmarks) in \
-                enumerate(zip(reg_pred_batch, heat_base_pred_batch, heat_novel_pred_batch, n_landmarks_batch)):
+            if heat_novel_pred_batch is None:
+                complete_heatmaps_batch = heat_base_pred_batch
+            elif is_full:
+                complete_heatmaps_batch = T.cat([heat_base_pred_batch, heat_novel_pred_batch], dim=1)
+            elif is_novel:
+                complete_heatmaps_batch = T.cat([T.zeros_like(heat_base_pred_batch), heat_novel_pred_batch], dim=1)
+            else:
+                raise NotImplementedError
 
-                if heat_novel_pred is None:
-                    complete_heatmaps = heat_base_pred
-                else:
-                    complete_heatmaps = T.cat([heat_base_pred, heat_novel_pred])
+            # iteration on batch_size
+            for i, (reg_pred, complete_heatmaps, n_landmarks) in \
+                enumerate(zip(reg_pred_batch, complete_heatmaps_batch, n_landmarks_batch)):
+
 
                 idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
 

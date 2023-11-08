@@ -78,7 +78,7 @@ data:
     hue_jitter: 0.1
 
   min_IoU_for_gaussian_radius: 0.8
-  max_detections: [1, 10, 50]
+  max_detections: [1, 10, 30]
 
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 

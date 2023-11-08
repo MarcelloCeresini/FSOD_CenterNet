@@ -114,8 +114,7 @@ def main(args):
     if config['training']['train_novel']:
         
         metrics_novel_list = {k: [] for k in K}
-        # TODO: Maybe it's better to evaluate on full in another script
-        # metrics_full_list  = {k: [] for k in conf['data']['K']}
+        metrics_full_list  = {k: [] for k in K}
 
         # Check K, val_K and test_K
         if len(K) == 1 and len(K) != n_repeats_novel_train:
@@ -192,19 +191,19 @@ def main(args):
                 metrics_novel = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
                 metrics_novel_list[current_train_K].append(metrics_novel)
 
-                # TODO: merge the two datasets
-                # TODO: can we do this in another file? It may happen that we only train on base or on novel
-                # ANSWER: we don't save the weights of the novel heads, so we can't evaluate after this point (or otherwise we save the weights)
-                # Evaluation on full dataset
-                # metrics_full = Evaluate(model, dataset_full_test)
-                # metrics_full_list[current_train_K].append(metrics_full)
+                # Evaluation on base + novel
+                full_test_dataloader = dataset_gen.generate_full_dataloader(dataset_novel_test, 
+                                                                            config['training']['batch_size'])
+                metrics_full = Evaluate(model, full_test_dataloader, device, config, prefix='full/')(is_full=True)
+                metrics_full_list[current_train_K].append(metrics_full)
 
             with open(os.path.join(config['training']['save_training_info_dir'], 
                                    config['training']['novel_stats_save_name']), 'wb') as f:
                 pickle.dump(metrics_novel_list, f)
 
-            # with open(os.path.join(conf['training']['save_training_info_dir'], 'full_training_info.pkl'), 'wb') as f:
-            #     pickle.dump(metrics_full_list, f)
+            with open(os.path.join(config['training']['save_training_info_dir'], 
+                                   'full_training_info.pkl'), 'wb') as f:
+                pickle.dump(metrics_full_list, f)
 
 
 if __name__ == "__main__":

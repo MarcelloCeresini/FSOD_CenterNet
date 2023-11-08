@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, List
 
 from pycocotools.coco import COCO
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, ConcatDataset, Dataset
 from torchvision.io import ImageReadMode, read_image
 
 from .transform import TransformTesting, TransformTraining
@@ -208,8 +208,22 @@ class DatasetsGenerator():
             ))
         )
     
-    def get_base_sets_dataloaders(self, batch_size = None, num_workers = 1, pin_memory = True,
-                                  drop_last = False, shuffle = True):
+    def generate_full_dataloader(self, test_novel_dataloader: DataLoader, 
+                                 batch_size = None,
+                                 num_workers = 1, pin_memory = True,
+                                 drop_last = False, shuffle = True):
+        test_novel_dataset = test_novel_dataloader.dataset
+        _, _, test_base_dataset = self.get_base_sets()
+        full_test_dataset  = ConcatDataset([test_base_dataset, test_novel_dataset])
+        full_test_loader   = DataLoader( dataset=full_test_dataset, 
+                                        batch_size=batch_size, num_workers=num_workers,
+                                        pin_memory=pin_memory, drop_last=drop_last, 
+                                        shuffle=shuffle)
+        return full_test_loader
+    
+    def get_base_sets_dataloaders(self, batch_size = None, num_workers = 1, 
+                                  pin_memory = True, drop_last = False, 
+                                  shuffle = True):
         train_base, val_base, test_base = self.get_base_sets()
         return (
             DataLoader(dataset=train_base, batch_size=batch_size, num_workers=num_workers,
