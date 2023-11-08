@@ -147,10 +147,10 @@ class LandmarksTransform:
             padded_landmarks["boxes"][i,0] = l["center_point"][0] / self.output_stride[0]
             padded_landmarks["boxes"][i,1] = l["center_point"][1] / self.output_stride[1]
             # TODO: decide if we need to normalize
-            # padded_landmarks["boxes"][i,2] = l["size"][0] / self.input_resolution[0]
-            # padded_landmarks["boxes"][i,3] = l["size"][1] / self.input_resolution[1]
-            padded_landmarks["boxes"][i,2] = l["size"][0] / self.output_stride[0]
-            padded_landmarks["boxes"][i,3] = l["size"][1] / self.output_stride[1]
+            padded_landmarks["boxes"][i,2] = l["size"][0] / self.input_resolution[0]
+            padded_landmarks["boxes"][i,3] = l["size"][1] / self.input_resolution[1]
+            # padded_landmarks["boxes"][i,2] = l["size"][0] / self.output_stride[0]
+            # padded_landmarks["boxes"][i,3] = l["size"][1] / self.output_stride[1]
             padded_landmarks["labels"][i]  = self.base_class_list.index(l["category_id"])   \
                 if l['category_id'] in self.base_class_list \
                 else self.novel_class_list.index(l["category_id"]) + len(self.base_class_list)

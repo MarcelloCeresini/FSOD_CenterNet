@@ -95,15 +95,7 @@ def main(args):
                                 optimizer=optimizer_base,
                                 scheduler=scheduler_base,
                                 device=device)
-            
-            # Evaluation on base train dataset
-            metrics = Evaluate(
-                model, 
-                dataset_base_train, 
-                prefix="train/",
-                device=device,
-                config=config
-            )(is_novel=False)
+
             # Evaluation also on base test dataset
             metrics_test = Evaluate(
                 model, 
@@ -112,12 +104,11 @@ def main(args):
                 device=device,
                 config=config
             )(is_novel=False)
-            metrics.update(metrics_test)
 
             # TODO: add timestamp so that it doesn't overwrite the same metrics over and over
             with open(os.path.join(config['training']['save_training_info_dir'], 
                                    config['training']['base_stats_save_name']), 'wb') as f:
-                pickle.dump(metrics, f)
+                pickle.dump(metrics_test, f)
 
     ## NOVEL TRAININGS ##
     if config['training']['train_novel']:
@@ -196,9 +187,7 @@ def main(args):
                 wandb.watch(model, log='all', log_freq=config['debug']['wandb_watch_model_freq'])
 
                 # Evaluation on novel_dataset
-                metrics_novel = Evaluate(model, dataset_novel_train, device, config, prefix="train/")(is_novel=True)
-                m = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
-                metrics_novel.update(m)
+                metrics_novel = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
                 metrics_novel_list[current_train_K].append(metrics_novel)
 
                 # TODO: merge the two datasets

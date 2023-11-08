@@ -115,14 +115,22 @@ class Evaluate:
         for i, (c, cx, cy, sx, sy, score) in \
             enumerate(zip(category, center_coord_x, center_coord_y, size_x, size_y, confidence_scores)):
 
-                landmarks_pred["boxes"][i,0] = cx
-                landmarks_pred["boxes"][i,1] = cy
-                landmarks_pred["boxes"][i,2] = sx
-                landmarks_pred["boxes"][i,3] = sy
+                landmarks_pred["boxes"][i,0] = cx 
+                landmarks_pred["boxes"][i,1] = cy 
+                landmarks_pred["boxes"][i,2] = sx 
+                landmarks_pred["boxes"][i,3] = sy 
                 landmarks_pred["labels"][i] = c
                 landmarks_pred["scores"][i] = score
 
         return landmarks_pred
+
+    def resize_landmarks(self, landmarks):
+        for l in landmarks:
+            l["boxes"][:,0] *= self.config['data']['output_stride'][0]
+            l["boxes"][:,1] *= self.config['data']['output_stride'][1]
+            l["boxes"][:,2] *= self.config['data']['input_to_model_resolution'][0]
+            l["boxes"][:,3] *= self.config['data']['input_to_model_resolution'][1]
+        return landmarks
 
     @T.no_grad()
     def __call__(self, is_novel=False):
@@ -168,6 +176,9 @@ class Evaluate:
                     "boxes": padded_landmarks["boxes"][i,:n_landmarks,:],
                     "labels": padded_landmarks["labels"][i,:n_landmarks]
                 }
+
+                landmarks_pred = self.resize_landmarks(landmarks_pred)
+                landmarks_gt = self.resize_landmarks(landmarks_gt)
 
                 pred_batch.append(landmarks_pred)
                 gt_batch.append(landmarks_gt)

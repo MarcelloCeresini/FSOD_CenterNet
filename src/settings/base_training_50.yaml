@@ -1,6 +1,6 @@
 # Model parameters:
 model:
-  encoder_name: resnet18
+  encoder_name: resnet50
   less_convs: False
   softmax_activation: False
   head_base_heatmap_mode: CosHead
@@ -11,8 +11,8 @@ model:
   range_extender_cos_head: 10.0     # Fixed to 10. by the paper
   alpha_loss: 2                     # TODO: should be hyperparameter of focal loss
   beta_loss: 4                      # TODO: should be hyperparameter of focal loss
-  lambda_size_loss: 0.1
-  lambda_offset_loss: 1.
+  lambda_size_loss: 10.0            # 2 magnitude orders larger than standard coefficient due to normalization
+  lambda_offset_loss: 1.0
 
 training:
   no_overwrite: False               #TODO: put it to True once base training is done
@@ -29,7 +29,7 @@ training:
     epochs: 100
     epoch_metric_log_interval: 2
     train_step_log_interval: 1000
-    early_stopping_patience: 8
+    early_stopping_patience: 10
     early_stopping_min_delta: 0.2
 
   novel:
@@ -42,10 +42,10 @@ training:
     early_stopping_patience: 8
     early_stopping_min_delta: 0.2
   
-  loss_clip_norm: 1.0
+  loss_clip_norm: 2.0
 
-  batch_size: 32
-  num_workers: 8
+  batch_size: 4
+  num_workers: 4
   pin_memory: True
   drop_last: False
 
@@ -53,14 +53,14 @@ training:
   save_novel_weights_dir: ../data/weights/novel/
   save_training_info_dir: ../data/training_info/
 
-  base_weights_save_name: 'best_model.pt'
-  base_weights_load_name: 'best_model.pt'
-  base_stats_save_name: 'base_training_info.pkl'
-  novel_stats_save_name: 'novel_training_info.pkl'
+  base_weights_save_name: best_model_50.pt
+  base_weights_load_name: best_model_50.pt
+  base_stats_save_name: base_training_info_50.pkl
+  novel_stats_save_name: novel_training_info_50.pkl
 
 # Dataset parameters
 data:
-  input_to_model_resolution: [64, 64]
+  input_to_model_resolution: [256, 256]
   output_stride: [4, 4]
 
   augmentations:
@@ -75,7 +75,7 @@ data:
     hue_jitter: 0.1
 
   min_IoU_for_gaussian_radius: 0.8
-  max_detections: [1, 10, 50]
+  max_detections: [1,10,30]
 
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
@@ -101,9 +101,6 @@ data:
 
   test_K: [15,20]                            # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
-
-eval:
-  threshold_only_classification_metric: 0.5
 
 paths:
   images_dir: ../data                                         # Base folder for image paths

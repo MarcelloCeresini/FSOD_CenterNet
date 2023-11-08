@@ -1,8 +1,8 @@
 # Model parameters:
 model:
-  encoder_name: resnet18
-  less_convs: True
-  softmax_activation: False
+  encoder_name: resnet50
+  less_convs: False
+  softmax_activation: True
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
@@ -11,8 +11,8 @@ model:
   range_extender_cos_head: 10.0     # Fixed to 10. by the paper
   alpha_loss: 2                     # TODO: should be hyperparameter of focal loss
   beta_loss: 4                      # TODO: should be hyperparameter of focal loss
-  lambda_size_loss: 0.1
-  lambda_offset_loss: 1.
+  lambda_size_loss: 10.0            # 2 magnitude orders larger than standard coefficient due to normalization
+  lambda_offset_loss: 1.0
 
 training:
   no_overwrite: False               #TODO: put it to True once base training is done
@@ -29,7 +29,7 @@ training:
     epochs: 100
     epoch_metric_log_interval: 2
     train_step_log_interval: 1000
-    early_stopping_patience: 8
+    early_stopping_patience: 10
     early_stopping_min_delta: 0.2
 
   novel:
@@ -44,23 +44,23 @@ training:
   
   loss_clip_norm: 2.0
 
-  batch_size: 1
-  num_workers: 1
+  batch_size: 4
+  num_workers: 4
   pin_memory: True
   drop_last: False
 
-  save_base_weights_dir: ../../data/weights/base/
-  save_novel_weights_dir: ../../data/weights/novel/
-  save_training_info_dir: ../../data/training_info/
+  save_base_weights_dir: ../data/weights/base/
+  save_novel_weights_dir: ../data/weights/novel/
+  save_training_info_dir: ../data/training_info/
 
-  base_weights_save_name: 'best_model_fix.pt'
-  base_weights_load_name: 'best_model_fix.pt'
-  base_stats_save_name: 'base_training_info.pkl'
-  novel_stats_save_name: 'novel_training_info.pkl'
+  base_weights_save_name: best_model_50_softmax.pt
+  base_weights_load_name: best_model_50_softmax.pt
+  base_stats_save_name: base_training_info_50_softmax.pkl
+  novel_stats_save_name: novel_training_info_50_softmax.pkl
 
 # Dataset parameters
 data:
-  input_to_model_resolution: [128, 128]
+  input_to_model_resolution: [256, 256]
   output_stride: [4, 4]
 
   augmentations:
@@ -75,7 +75,7 @@ data:
     hue_jitter: 0.1
 
   min_IoU_for_gaussian_radius: 0.8
-  max_detections: [1, 10, 50]
+  max_detections: [1,10,30]
 
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
@@ -102,17 +102,14 @@ data:
   test_K: [15,20]                            # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
-eval:
-  threshold_only_classification_metric: 0.5
-
 paths:
-  images_dir: ../../data                                         # Base folder for image paths
-  annotations_path: ../../data/full_2017_bboxes.json             # Full path for annotations
-  novel_classes_ids_path: ../../data/novel_class_ids.json        # File containing pre-determined possible class IDs
+  images_dir: ../data                                         # Base folder for image paths
+  annotations_path: ../data/full_2017_bboxes.json             # Full path for annotations
+  novel_classes_ids_path: ../data/novel_class_ids.json        # File containing pre-determined possible class IDs
   
-  train_base_annotations_path: ../../data/base_dset/base_train.json   # The base train set
-  val_base_annotations_path  : ../../data/base_dset/base_val.json     # The base validation set
-  test_base_annotations_path : ../../data/base_dset/base_test.json    # The base test set
+  train_base_annotations_path: ../data/base_dset/base_train.json   # The base train set
+  val_base_annotations_path  : ../data/base_dset/base_val.json     # The base validation set
+  test_base_annotations_path : ../data/base_dset/base_test.json    # The base test set
   
   train_novel_annotations_path: null                          # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel train set
   val_novel_annotations_path: null                            # If use_fixed_sets = True, it expects this to contain the annotation file we want to use for the novel val set
