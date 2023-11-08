@@ -16,6 +16,8 @@ model:
 
 training:
   no_overwrite: False               #TODO: put it to True once base training is done
+  
+  normalize_size: False
 
   train_base: True
   train_novel: False

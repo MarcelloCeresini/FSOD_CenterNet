@@ -106,8 +106,10 @@ class LandmarksToLabels:
             offset = [low_res_cp[i] - lr_cp_idx[i]
                       for i in range(len(low_res_cp))]
 
-            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0] / self.input_resolution[0]
-            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1] / self.input_resolution[0]
+            regressor_label[0, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][0] / \
+                (self.input_resolution[0] if self.config['training']['normalize_size'] else 1)
+            regressor_label[1, lr_cp_idx[0], lr_cp_idx[1]] = l["size"][1] / \
+                (self.input_resolution[1] if self.config['training']['normalize_size'] else 1)
             regressor_label[2, lr_cp_idx[0], lr_cp_idx[1]] = offset[0]
             regressor_label[3, lr_cp_idx[0], lr_cp_idx[1]] = offset[1]
 
@@ -130,11 +132,14 @@ class LandmarksTransform:
                  base_class_list: List,
                  novel_class_list: List):
 
+        self.config = config
         self.max_detections = max(config['data']['max_detections'])
         self.base_class_list = base_class_list
         self.novel_class_list = novel_class_list
         self.output_stride = config["data"]["output_stride"]
         self.input_resolution = config['data']['input_to_model_resolution']
+
+
     def __call__(self,
              landmarks):
         
@@ -146,11 +151,9 @@ class LandmarksTransform:
         for i, l in enumerate(landmarks):
             padded_landmarks["boxes"][i,0] = l["center_point"][0] / self.output_stride[0]
             padded_landmarks["boxes"][i,1] = l["center_point"][1] / self.output_stride[1]
-            # TODO: decide if we need to normalize
-            padded_landmarks["boxes"][i,2] = l["size"][0] / self.input_resolution[0]
-            padded_landmarks["boxes"][i,3] = l["size"][1] / self.input_resolution[1]
-            # padded_landmarks["boxes"][i,2] = l["size"][0] / self.output_stride[0]
-            # padded_landmarks["boxes"][i,3] = l["size"][1] / self.output_stride[1]
+            if self.config['training']['normalize_size']:
+                padded_landmarks["boxes"][i,2] = l["size"][0] / self.input_resolution[0]
+                padded_landmarks["boxes"][i,3] = l["size"][1] / self.input_resolution[1]
             padded_landmarks["labels"][i]  = self.base_class_list.index(l["category_id"])   \
                 if l['category_id'] in self.base_class_list \
                 else self.novel_class_list.index(l["category_id"]) + len(self.base_class_list)
