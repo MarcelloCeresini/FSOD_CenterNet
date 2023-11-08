@@ -43,7 +43,7 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
-        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=True, 
+        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=False, 
                                            max_detection_thresholds=self.config['data']['max_detections'])
         self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
 
