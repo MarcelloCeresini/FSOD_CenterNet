@@ -31,7 +31,8 @@ class HeadHeatmap(Module):
                                 kernel_size=3,
                                 padding=1)
 
-        self.activation1 = ReLU()
+        self.relu = ReLU()
+        self.sigmoid = Sigmoid()
         
         if mode == "convolution":
             self.second_block = Conv2d(in_channels, 
@@ -43,29 +44,27 @@ class HeadHeatmap(Module):
             self.second_block = CosHead(config, n_classes, mode="adaptive")
         else:
             raise NotImplementedError("'{}' - this mode is not implemented yet".format(mode))
-        
-        self.activation2 = Sigmoid()
 
         if self.softmax_activation:
             self.pixel_wise_rescaling = Conv2d(in_channels=n_classes,
                                                out_channels=1,
                                                kernel_size=1)
-            self.activation3 = Softmax(dim=1)
+            self.softmax = Softmax(dim=1)
 
     def forward(self, x):
         x = self.conv1(x)
         if not self.less_convs:
-            x = self.activation1(x)
+            x = self.relu(x)
             x = self.conv2(x)
-            x = self.activation1(x)
+            x = self.relu(x)
             x = self.conv3(x)
-        x = self.activation1(x)
+        x = self.relu(x)
         x = self.second_block(x)
         if not self.softmax_activation:
-            x = self.activation2(x)
+            x = self.sigmoid(x)
         else:
             y = self.pixel_wise_rescaling(x)
-            y = self.activation2(x)
-            x = self.activation3(x)
+            y = self.sigmoid(y)
+            x = self.softmax(x)
             x = x*y
         return x
