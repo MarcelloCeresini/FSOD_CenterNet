@@ -198,7 +198,7 @@ class Evaluate:
                 ious = box_iou(box_convert(landmarks_gt["boxes"], in_fmt="cxcywh", out_fmt="xyxy"),
                                box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
                 
-                ious_mask = ious >= 0.3
+                ious_mask = ious >= thrs
 
                 labels_correct = T.zeros_like(ious)
                 for j, gt_label in enumerate(landmarks_gt["labels"]):

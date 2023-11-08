@@ -21,7 +21,7 @@ training:
 
   train_base: False
   train_novel: True
-  repeat_novel_training: 5
+  repeat_novel_training: 3
 
   base:
     lr: 0.001
