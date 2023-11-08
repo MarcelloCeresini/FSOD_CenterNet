@@ -43,7 +43,8 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
-        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=True)
+        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=True, 
+                                           max_detection_thresholds=self.config['data']['max_detections'])
         self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
 
     @T.no_grad()
@@ -62,7 +63,7 @@ class Evaluate:
         n_classes, output_width, output_height = idxs_tensor_mask.shape
 
         num_detections = T.sum(idxs_tensor_mask).to('cpu')
-        num_detections = min(self.config['data']['max_detections'], num_detections)
+        num_detections = min(max(self.config['data']['max_detections']), num_detections)
         
         landmarks_pred = {
             "boxes": T.zeros(num_detections,4),
@@ -204,16 +205,26 @@ class Evaluate:
                 preds=pred_positive_batch,
                 target=gt_positive_batch
             )
-    
+
+        self.metric.set_dtype(T.float16)
+        self.metric.detection_labels = [d.to(T.int16) for d in self.metric.detection_labels]
+        self.metric.groundtruth_labels = [d.to(T.int16) for d in self.metric.groundtruth_labels]
+
+        self.metric_only_regression.set_dtype(T.float16)
+        self.metric_only_regression.detection_labels = [d.to(T.int16) for d in self.metric_only_regression.detection_labels]
+        self.metric_only_regression.groundtruth_labels = [d.to(T.int16) for d in self.metric_only_regression.groundtruth_labels]
+
         result = {
             self.prefix + k: v
             for k, v in self.metric.compute().items()
         }
+        self.metric.reset()
 
         result_regression = {
             self.prefix + "regression_" + k: v
             for k, v in self.metric_only_regression.compute().items()
         }
+        self.metric_only_regression.reset()
 
         result.update(result_regression)
         result.update({"classification_precision": only_classification_metric})

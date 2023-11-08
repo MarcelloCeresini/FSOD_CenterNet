@@ -24,7 +24,7 @@ class LandmarksToLabels:
         self.heatmap_base_size      = [len(self.base_classes), *self.output_resolution]
         self.heatmap_novel_size     = [len(self.novel_classes), *self.output_resolution]
         self.min_IoU_for_gaussian_radius = config['data']['min_IoU_for_gaussian_radius']
-        self.max_detections = config['data']['max_detections']
+        self.max_detections = max(config['data']['max_detections'])
 
     def gaussian_radius(self, det_size, min_overlap):
         '''
@@ -130,7 +130,7 @@ class LandmarksTransform:
                  base_class_list: List,
                  novel_class_list: List):
 
-        self.max_detections = config['data']['max_detections']
+        self.max_detections = max(config['data']['max_detections'])
         self.base_class_list = base_class_list
         self.novel_class_list = novel_class_list
         self.output_stride = config["data"]["output_stride"]

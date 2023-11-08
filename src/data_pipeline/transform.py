@@ -12,8 +12,6 @@ class TransformTraining:
                  config: Dict,
                  base_classes: List = [],
                  novel_classes: List = []) -> None:
-        
-        self.max_detections = config['data']['max_detections']
 
         self.random_crop = RandomResizedCropOwn(
             size=config['data']['input_to_model_resolution'],

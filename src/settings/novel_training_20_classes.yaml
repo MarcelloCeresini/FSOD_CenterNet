@@ -1,7 +1,8 @@
 # Model parameters:
 model:
   encoder_name: resnet18
-  less_convs: False
+  less_convs: True
+  softmax_activation: False
   head_base_heatmap_mode: CosHead
   head_novel_heatmap_mode: AdaptiveCosHead
 
@@ -75,7 +76,7 @@ data:
     hue_jitter: 0.1
 
   min_IoU_for_gaussian_radius: 0.8
-  max_detections: 100
+  max_detections: [1, 10, 50]
 
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
@@ -93,14 +94,17 @@ data:
                                         # we can instead pass two pre-made train and validation sets + a novel train
                                         # and a novel val sets that will directly be used.
 
-  K: [1, 5, 10, 30]                     # The number of few shots for the novel classes. Can also be a list: in that case
+  K: [1, 5, 10, 20]                     # The number of few shots for the novel classes. Can also be a list: in that case
                                         # experiments will be repeated |K| times.
   
-  val_K: [10, 15, 20, 30]               # The number of few shots for the novel classes in the val dataset. 
+  val_K: [10, 15, 20]               # The number of few shots for the novel classes in the val dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
-  test_K: [89, 80, 70, 40]              # The number of few shots for the novel classes in the test dataset. 
+  test_K: [60, 55, 40]              # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
+
+eval:
+  threshold_only_classification_metric: 0.5
 
 paths:
   images_dir: ../data                                         # Base folder for image paths
