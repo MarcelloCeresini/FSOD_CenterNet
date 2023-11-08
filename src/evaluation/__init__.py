@@ -125,12 +125,11 @@ class Evaluate:
         return landmarks_pred
 
     def resize_landmarks(self, landmarks):
-        for l in landmarks:
-            l["boxes"][:,0] *= self.config['data']['output_stride'][0]
-            l["boxes"][:,1] *= self.config['data']['output_stride'][1]
-            if self.config['training']['normalize_size']:
-                l["boxes"][:,2] *= self.config['data']['input_to_model_resolution'][0]
-                l["boxes"][:,3] *= self.config['data']['input_to_model_resolution'][1]
+        landmarks["boxes"][:,0] *= self.config['data']['output_stride'][0]
+        landmarks["boxes"][:,1] *= self.config['data']['output_stride'][1]
+        if self.config['training']['normalize_size']:
+            landmarks["boxes"][:,2] *= self.config['data']['input_to_model_resolution'][0]
+            landmarks["boxes"][:,3] *= self.config['data']['input_to_model_resolution'][1]
         return landmarks
 
     @T.no_grad()

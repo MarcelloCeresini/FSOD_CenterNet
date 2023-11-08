@@ -10,6 +10,7 @@ class LandmarksToLabels:
                  base_class_list: List,
                  novel_class_list: List) -> None:
         
+        self.config                 = config
         self.base_classes           = base_class_list
         self.novel_classes          = novel_class_list
 

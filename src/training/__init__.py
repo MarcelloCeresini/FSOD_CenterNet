@@ -34,8 +34,7 @@ def set_model_to_train_novel(model: Model, config: Dict):
 
     # Finally, stop training for base model (only novel model shall be learned)
     for module in model.named_children():
-        if module[0] != "head_novel_heatmap":
-            module[1].requires_grad_(False)
+        module[1].requires_grad_(module[0] == "head_novel_heatmap")
 
     return model
 
@@ -47,12 +46,14 @@ def train_loop(model,
                optimizer,
                scheduler,
                device,
-               novel_training=False):
+               novel_training=False,
+               novel_k=None):
     
     train_group = 'base' if not novel_training else 'novel'
     epochs = config['training'][train_group]['epochs']
     weights_path = config['training']['save_base_weights_dir']
-    epoch_metric_log_interval = config['training'][train_group]['epoch_metric_log_interval']
+    epoch_metric_log_interval = config['training'][train_group]['epoch_metric_log_interval'] / \
+        (novel_k if novel_k is not None else 1)
     
     # print("####################")
     # print(f"Started {'base' if not novel_training else 'novel'} training")
@@ -62,7 +63,8 @@ def train_loop(model,
     batch_count = 0
 
     early_stopper = EarlyStopper(
-        patience=config['training']['base' if not novel_training else 'novel']['early_stopping_patience'],
+        patience=config['training']['base' if not novel_training else 'novel']['early_stopping_patience'] / \
+            (novel_k if novel_k is not None else 1),
         min_delta=config['training']['base' if not novel_training else 'novel']['early_stopping_min_delta']
     )
 

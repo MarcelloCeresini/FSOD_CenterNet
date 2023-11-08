@@ -139,17 +139,20 @@ def main(args):
         total_trainings = len(K) * n_repeats_novel_train
         for i in tqdm(range(total_trainings), position=0, desc="Novel trainings: ", leave=True):
 
-            with wandb.init(project="FSOD_CenterNet", 
-                            group="novel_training",
-                            config=config):
+            current_train_K = K[i % n_repeats_novel_train]
+            current_val_K   = val_K[i % n_repeats_novel_train]
+            current_test_K  = test_K[i % n_repeats_novel_train]
 
-                current_train_K = K[i % n_repeats_novel_train]
-                current_val_K   = val_K[i % n_repeats_novel_train]
-                current_test_K  = test_K[i % n_repeats_novel_train]
+            with wandb.init(project="FSOD_CenterNet", 
+                            group=f"novel_training_{current_train_K}",
+                            entity="marcello-e-federico",
+                            config=config):
 
                 # Reload weights from base training + freeze base part
                 model = set_model_to_train_novel(model, config)
                 model = model.to(device)
+                wandb.watch(model, log='all', 
+                            log_freq=config['debug']['wandb_watch_model_freq']*current_train_K)
 
                 # Optimizer
                 optimizer_novel = Adam(model.parameters(), 
@@ -182,9 +185,8 @@ def main(args):
                     optimizer=optimizer_novel,
                     scheduler=scheduler_novel,
                     device=device,
-                    novel_training=True)
-                
-                wandb.watch(model, log='all', log_freq=config['debug']['wandb_watch_model_freq'])
+                    novel_training=True,
+                    novel_k=current_train_K)
 
                 # Evaluation on novel_dataset
                 metrics_novel = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)

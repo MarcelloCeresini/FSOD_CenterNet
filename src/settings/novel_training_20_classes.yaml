@@ -39,10 +39,10 @@ training:
     encoder_lr: 0.0001
     reduce_lr_patience: 5
     weight_decay: 0.0001
-    epochs: 50
-    epoch_metric_log_interval: 1
-    train_step_log_interval: 500
-    early_stopping_patience: 8
+    epochs: 100000000
+    epoch_metric_log_interval: 40
+    train_step_log_interval: 1
+    early_stopping_patience: 300
     early_stopping_min_delta: 0.2
   
   loss_clip_norm: 2.0
@@ -99,10 +99,10 @@ data:
   K: [1, 5, 10, 20]                     # The number of few shots for the novel classes. Can also be a list: in that case
                                         # experiments will be repeated |K| times.
   
-  val_K: [10, 15, 20]               # The number of few shots for the novel classes in the val dataset. 
+  val_K: [10, 15, 20, 25]               # The number of few shots for the novel classes in the val dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
-  test_K: [60, 55, 40]              # The number of few shots for the novel classes in the test dataset. 
+  test_K: [64, 55, 45, 25]              # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
 eval:
@@ -123,6 +123,6 @@ paths:
 
 debug:
   debug_mode_active: True
-  wandb_watch_model_freq: 100
+  wandb_watch_model_freq: 50
 
 device: cuda       # "cpu" or "cuda"
