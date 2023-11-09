@@ -12,7 +12,7 @@
             "program": "train.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["-sett", "settings/model_testing_debug.yaml"]
+            "args": ["-sett", "settings/base_training.yaml"]
         },{
             "name": "Launch Novel Trainings",
             "type": "python",
@@ -26,11 +26,10 @@
             "name": "Launch Evaluation",
             "type": "python",
             "request": "launch",
-            "cwd": "${workspaceFolder}/src",
-            "program": "final_model_evaluation.py",
+            "cwd": "${workspaceFolder}/src/notebooks",
+            "program": "final_model_eval.py",
             "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["-Xfrozen_modules=off"]
+            "justMyCode": false
         }
     ]
 }
