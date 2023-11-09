@@ -10,7 +10,8 @@ def train_one_epoch(model,
                     optimizer,
                     device,
                     novel_training=False,
-                    batch_count=0):
+                    batch_count=0,
+                    class_weights=None):
 
     running_loss = 0.
 
@@ -27,12 +28,12 @@ def train_one_epoch(model,
 
         if novel_training:
             loss_1 = T.mean(heatmap_loss(
-                        pred_heat_novel, gt_heat_novel, n_detections, config
+                        pred_heat_novel, gt_heat_novel, n_detections, config, class_weights
                     ), dim=0)
             
         else:
             loss_1 = T.mean(heatmap_loss(
-                        pred_heat_base, gt_heat_base, n_detections, config
+                        pred_heat_base, gt_heat_base, n_detections, config, class_weights
                     ), dim=0)
             
         loss_2 = T.mean(reg_loss(
