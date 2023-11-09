@@ -138,9 +138,9 @@ def main(args):
         total_trainings = len(K) * n_repeats_novel_train
         for i in tqdm(range(total_trainings), position=0, desc="Novel trainings: ", leave=True):
 
-            current_train_K = K[i % n_repeats_novel_train]
-            current_val_K   = val_K[i % n_repeats_novel_train]
-            current_test_K  = test_K[i % n_repeats_novel_train]
+            current_train_K = K[i % len(K)]
+            current_val_K   = val_K[i % len(val_K)]
+            current_test_K  = test_K[i % len(test_K)]
 
             with wandb.init(project="FSOD_CenterNet", 
                             group=f"novel_training_{current_train_K}",
