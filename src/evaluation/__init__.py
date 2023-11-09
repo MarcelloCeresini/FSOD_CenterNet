@@ -36,7 +36,9 @@ class Evaluate:
                  dataset,
                  device,
                  config,
-                 prefix=""):
+                 prefix="",
+                 more_metrics=False,
+                 half_precision=False):
         
         self.model   = model
         self.dataset = dataset
@@ -45,7 +47,10 @@ class Evaluate:
         self.config  = config
         self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=False, 
                                            max_detection_thresholds=self.config['data']['max_detections'])
-        self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
+        self.more_metrics = more_metrics
+        if self.more_metrics:
+            self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
+        self.half_precision = half_precision
 
     @T.no_grad()
     def get_heatmap_maxima_idxs(self, 
@@ -136,9 +141,10 @@ class Evaluate:
     def __call__(self, is_novel=False, is_full:bool=False):
         assert not (is_novel and is_full), "is_novel and is_full cannot be both True"
 
-        only_classification_metric = 0
-        n=0
-        thrs = self.config["eval"]["threshold_only_classification_metric"]
+        if self.more_metrics:
+            only_classification_metric = 0
+            n=0
+            thrs = self.config["eval"]["threshold_only_classification_metric"]
 
         for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
                 enumerate(self.dataset), total=len(self.dataset), position=1 + int(is_novel), 
@@ -150,8 +156,9 @@ class Evaluate:
 
             pred_batch = []
             gt_batch   = []
-            pred_positive_batch = []
-            gt_positive_batch = []
+            if self.more_metrics:
+                pred_positive_batch = []
+                gt_positive_batch = []
 
             if heat_novel_pred_batch is None:
                 complete_heatmaps_batch = heat_base_pred_batch
@@ -186,61 +193,66 @@ class Evaluate:
                 pred_batch.append(landmarks_pred)
                 gt_batch.append(landmarks_gt)
 
-                landmarks_pred_positive = landmarks_pred.copy()
-                landmarks_gt_positive = landmarks_gt.copy()
+                if self.more_metrics:
+                    landmarks_pred_positive = landmarks_pred.copy()
+                    landmarks_gt_positive = landmarks_gt.copy()
 
-                landmarks_pred_positive["labels"] = T.zeros_like(landmarks_pred_positive["labels"])
-                landmarks_gt_positive["labels"] = T.zeros_like(landmarks_gt_positive["labels"])
-                
-                pred_positive_batch.append(landmarks_pred_positive)
-                gt_positive_batch.append(landmarks_gt_positive)
+                    landmarks_pred_positive["labels"] = T.zeros_like(landmarks_pred_positive["labels"])
+                    landmarks_gt_positive["labels"] = T.zeros_like(landmarks_gt_positive["labels"])
+                    
+                    pred_positive_batch.append(landmarks_pred_positive)
+                    gt_positive_batch.append(landmarks_gt_positive)
 
-                ious = box_iou(box_convert(landmarks_gt["boxes"], in_fmt="cxcywh", out_fmt="xyxy"),
-                               box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
-                
-                ious_mask = ious >= thrs
+                    ious = box_iou(box_convert(landmarks_gt["boxes"], in_fmt="cxcywh", out_fmt="xyxy"),
+                                box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
+                    
+                    ious_mask = ious >= thrs
 
-                labels_correct = T.zeros_like(ious)
-                for j, gt_label in enumerate(landmarks_gt["labels"]):
-                    labels_correct[j,:] = landmarks_pred["labels"] == gt_label
+                    labels_correct = T.zeros_like(ious)
+                    for j, gt_label in enumerate(landmarks_gt["labels"]):
+                        labels_correct[j,:] = landmarks_pred["labels"] == gt_label
 
-                both_correct = T.logical_and(ious_mask, labels_correct)
-                precision = T.sum(both_correct) / T.sum(ious_mask) if T.sum(ious_mask) != 0 else 0
+                    both_correct = T.logical_and(ious_mask, labels_correct)
+                    precision = T.sum(both_correct) / T.sum(ious_mask) if T.sum(ious_mask) != 0 else 0
 
-                only_classification_metric = only_classification_metric*n/(n+1) + precision/(n+1)
-                n+=1
+                    only_classification_metric = only_classification_metric*n/(n+1) + precision/(n+1)
+                    n+=1
 
             self.metric.update(
                 preds=pred_batch, 
                 target=gt_batch
             )
 
-            self.metric_only_regression.update(
-                preds=pred_positive_batch,
-                target=gt_positive_batch
-            )
+            if self.more_metrics:
+                self.metric_only_regression.update(
+                    preds=pred_positive_batch,
+                    target=gt_positive_batch
+                )
 
-        self.metric.set_dtype(T.float16)
-        self.metric.detection_labels = [d.to(T.int16) for d in self.metric.detection_labels]
-        self.metric.groundtruth_labels = [d.to(T.int16) for d in self.metric.groundtruth_labels]
+        if self.half_precision:
+            self.metric.set_dtype(T.float16)
+            self.metric.detection_labels = [d.to(T.int16) for d in self.metric.detection_labels]
+            self.metric.groundtruth_labels = [d.to(T.int16) for d in self.metric.groundtruth_labels]
 
-        self.metric_only_regression.set_dtype(T.float16)
-        self.metric_only_regression.detection_labels = [d.to(T.int16) for d in self.metric_only_regression.detection_labels]
-        self.metric_only_regression.groundtruth_labels = [d.to(T.int16) for d in self.metric_only_regression.groundtruth_labels]
+            if self.more_metrics:
+                self.metric_only_regression.set_dtype(T.float16)
+                self.metric_only_regression.detection_labels = [d.to(T.int16) for d in self.metric_only_regression.detection_labels]
+                self.metric_only_regression.groundtruth_labels = [d.to(T.int16) for d in self.metric_only_regression.groundtruth_labels]
 
         result = {
             self.prefix + k: v
-            for k, v in self.metric.compute().items()
+            for k, v in self.metric.compute().copy().items()
         }
         self.metric.reset()
 
-        result_regression = {
-            self.prefix + "regression_" + k: v
-            for k, v in self.metric_only_regression.compute().items()
-        }
-        self.metric_only_regression.reset()
+        if self.more_metrics:
+            result_regression = {
+                self.prefix + "regression_" + k: v
+                for k, v in self.metric_only_regression.compute().copy().items()
+            }
+            self.metric_only_regression.reset()
 
-        result.update(result_regression)
-        result.update({"classification_precision": only_classification_metric})
+            result.update(result_regression)
+            result.update({"classification_precision": only_classification_metric})
 
         return result
