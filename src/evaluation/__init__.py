@@ -241,14 +241,16 @@ class Evaluate:
 
         result = {
             self.prefix + k: v
-            for k, v in self.metric.compute().copy().items()
+            for k, v in self.metric.compute().items()
+            # for k, v in self.metric.compute().copy().items()
         }
         self.metric.reset()
 
         if self.more_metrics:
             result_regression = {
                 self.prefix + "regression_" + k: v
-                for k, v in self.metric_only_regression.compute().copy().items()
+                for k, v in self.metric_only_regression.compute().items()
+                # for k, v in self.metric_only_regression.compute().copy().items()
             }
             self.metric_only_regression.reset()
 

@@ -47,6 +47,17 @@ if __name__ == "__main__":
             shuffle=True
         )
 
+        ann_cat_counts = T.zeros(len(dataset_gen.train_base.cats))
+        for class_id in dataset_gen.train_base.cats:
+            ann_cat_counts[list(dataset_gen.train_base.cats).index(class_id)] = len(dataset_gen.train_base.getAnnIds(catIds=[class_id]))
+
+        weights = T.stack(
+            [T.full(
+                (int(config["data"]["input_to_model_resolution"][0]/config["data"]["output_stride"][0]),
+                int(config["data"]["input_to_model_resolution"][1]/config["data"]["output_stride"][1])),
+             T.sum(ann_cat_counts) / cat_count)
+            for cat_count in ann_cat_counts])
+
     tic = time()
     metrics_test = Evaluate(
             model, 

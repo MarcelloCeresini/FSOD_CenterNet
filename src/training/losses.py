@@ -1,16 +1,27 @@
 import torch as T
 
-def heatmap_loss(pred_heatmap, gt_heatmap, num_keypoints, config):
+def heatmap_loss(pred_heatmap, gt_heatmap, num_keypoints, config, weights = None):
     # TODO: num_keypoints is not coherent with gt_heatmap == 1
     gt_heatmap = gt_heatmap.to(pred_heatmap.device)
     num_keypoints = num_keypoints.to(pred_heatmap.device)
 
-    loss = T.where(
-        gt_heatmap == 1,
-        (1 - pred_heatmap) ** config['model']['alpha_loss'] * T.log(pred_heatmap),
-        (1 - gt_heatmap) ** config['model']['beta_loss'] * \
-            (pred_heatmap) ** config['model']['alpha_loss'] * T.log(1 - pred_heatmap),
-    ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
+    if weights is not None:
+        loss = T.where(
+            gt_heatmap == 1,
+            (1 - pred_heatmap) ** config['model']['alpha_loss'] * T.log(pred_heatmap) * weights,
+            (1 - gt_heatmap) ** config['model']['beta_loss'] * \
+                (pred_heatmap) ** config['model']['alpha_loss'] * T.log(1 - pred_heatmap) * weights,
+        ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
+
+        loss /= T.sum(weights[:,0,0])
+
+    else:
+        loss = T.where(
+            gt_heatmap == 1,
+            (1 - pred_heatmap) ** config['model']['alpha_loss'] * T.log(pred_heatmap),
+            (1 - gt_heatmap) ** config['model']['beta_loss'] * \
+                (pred_heatmap) ** config['model']['alpha_loss'] * T.log(1 - pred_heatmap),
+        ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
 
     result = T.where(
         num_keypoints != 0,
