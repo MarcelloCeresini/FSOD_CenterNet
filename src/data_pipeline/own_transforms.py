@@ -59,7 +59,7 @@ class ResizeOwn():
         
         self.size = size
 
-        self.resize = Resize(size=self.size)
+        self.resize = Resize(size=self.size, antialias=True)
 
     def __call__(self, sample):
 
