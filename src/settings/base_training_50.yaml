@@ -11,27 +11,28 @@ model:
   range_extender_cos_head: 10.0     # Fixed to 10. by the paper
   alpha_loss: 2                     # TODO: should be hyperparameter of focal loss
   beta_loss: 4                      # TODO: should be hyperparameter of focal loss
-  lambda_size_loss: 10.0            # 2 magnitude orders larger than standard coefficient due to normalization
+  lambda_size_loss: 0.1
   lambda_offset_loss: 1.0
 
 training:
   no_overwrite: False               #TODO: put it to True once base training is done
   
   normalize_size: False
-  use_class_weights: False
+  use_class_weights: True
 
   train_base: True
   train_novel: False
   repeat_novel_training: 2
 
   base:
-    lr: 0.001
-    encoder_lr: 0.0001
+    lr: 0.0001
+    encoder_lr: 0.00001
     reduce_lr_patience: 8
     weight_decay: 0.0001
-    epochs: 100
+    epochs: 1000
+    warm_start: True
     epoch_metric_log_interval: 2
-    train_step_log_interval: 1000
+    train_step_log_interval: 250
     early_stopping_patience: 10
     early_stopping_min_delta: 0.2
 

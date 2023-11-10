@@ -18,10 +18,11 @@ training:
   no_overwrite: True               #TODO: put it to True once base training is done
   
   normalize_size: False
+  use_class_weights: False
 
   train_base: False
   train_novel: True
-  repeat_novel_training: 3
+  repeat_novel_training: 5
 
   base:
     lr: 0.001
@@ -35,8 +36,8 @@ training:
     early_stopping_min_delta: 0.2
 
   novel:
-    lr: 0.0001
-    encoder_lr: 0.0001
+    lr: 0.00001
+    encoder_lr: 0.000001
     reduce_lr_patience: 5
     weight_decay: 0.0001
     epochs: 100000000
@@ -52,7 +53,7 @@ training:
   pin_memory: True
   drop_last: False
 
-  save_base_weights_dir: ../data/weights/from_server/
+  save_base_weights_dir: ../data/weights/base/
   save_novel_weights_dir: ../data/weights/novel/
   save_training_info_dir: ../data/training_info/
 

@@ -40,6 +40,19 @@ def set_model_to_train_novel(model: Model, config: Dict):
     return model
 
 
+def setup_warm_start(model: Model, optimizer, freeze=True):
+    # Stop training for encoder
+    for module in model.named_children():
+        if 'encoder' in module[0]:
+            module[1].requires_grad_(not freeze)
+        else:
+            module[1].requires_grad_(True)
+
+    # Reduce learning rate
+    for g in optimizer.param_groups:
+        g['lr'] = g['lr'] * (0.1 if freeze else 10) 
+
+
 def train_loop(model,
                config,
                training_loader:DataLoader,
@@ -82,7 +95,7 @@ def train_loop(model,
                 (int(config["data"]["input_to_model_resolution"][0]/config["data"]["output_stride"][0]),
                 int(config["data"]["input_to_model_resolution"][1]/config["data"]["output_stride"][1])),
              T.sum(ann_cat_counts) / cat_count)
-            for cat_count in ann_cat_counts])
+            for cat_count in ann_cat_counts]).to(device)
     else:
         class_weights = None
 
@@ -90,6 +103,11 @@ def train_loop(model,
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
                       position=0 + int(novel_training),
                       leave=not novel_training):
+
+        if not novel_training and config['training']['base']['warm_start'] and epoch == 0:
+            setup_warm_start(model, optimizer)
+        elif not novel_training and config['training']['base']['warm_start'] and epoch == 1:
+            setup_warm_start(model, optimizer, freeze=False)
 
         # Train for one epoch
         model.train()
