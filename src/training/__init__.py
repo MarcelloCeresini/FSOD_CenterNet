@@ -1,6 +1,7 @@
 import os
 from typing import Dict
 import torch as T
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import wandb
 
@@ -41,8 +42,8 @@ def set_model_to_train_novel(model: Model, config: Dict):
 
 def train_loop(model,
                config,
-               training_loader,
-               validation_loader,
+               training_loader:DataLoader,
+               validation_loader:DataLoader,
                optimizer,
                scheduler,
                device,
@@ -68,6 +69,23 @@ def train_loop(model,
         min_delta=config['training']['base' if not novel_training else 'novel']['early_stopping_min_delta']
     )
 
+    if config['training']['use_class_weights']:
+        train_base_coco_dset = training_loader.dataset.coco
+        cats_list = list(train_base_coco_dset.cats)
+        ann_cat_counts = T.zeros(len(cats_list))
+        # Compute class counts for annotations
+        for class_id in train_base_coco_dset.cats:
+            ann_cat_counts[cats_list.index(class_id)] = len(train_base_coco_dset.getAnnIds(catIds=[class_id]))
+        # Weights are inverse frequencies
+        class_weights = T.stack(
+            [T.full(
+                (int(config["data"]["input_to_model_resolution"][0]/config["data"]["output_stride"][0]),
+                int(config["data"]["input_to_model_resolution"][1]/config["data"]["output_stride"][1])),
+             T.sum(ann_cat_counts) / cat_count)
+            for cat_count in ann_cat_counts])
+    else:
+        class_weights = None
+
     for epoch in tqdm(range(epochs), 
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
                       position=0 + int(novel_training),
@@ -81,7 +99,8 @@ def train_loop(model,
                                                 optimizer,
                                                 device,
                                                 novel_training=novel_training,
-                                                batch_count=batch_count)
+                                                batch_count=batch_count,
+                                                class_weights=class_weights)
 
         # Validate
         running_vloss = 0.0
@@ -99,13 +118,13 @@ def train_loop(model,
                     vloss_heat = T.mean(heatmap_loss(pred_heat_novel,
                                                 gt_heat_novel,
                                                 n_detections,
-                                                config),
+                                                config, class_weights),
                                    dim=0)
                 else:
                     vloss_heat = T.mean(heatmap_loss(pred_heat_base,
                                                 gt_heat_base,
                                                 n_detections,
-                                                config),
+                                                config, class_weights),
                                 dim=0)
 
                 vloss_reg = T.mean(reg_loss(pred_reg,
