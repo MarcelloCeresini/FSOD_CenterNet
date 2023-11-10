@@ -45,21 +45,14 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
-        self.metric = MeanAveragePrecision(box_format="cxcywh", class_metrics=False, 
-                                           max_detection_thresholds=self.config['data']['max_detections'])
+        self.metric = MeanAveragePrecision(box_format="cxcywh", 
+                                           class_metrics=False).to(self.device)
         self.more_metrics = more_metrics
         if self.more_metrics:
-            self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh")
+            self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh").to(
+                self.device)
         self.half_precision = half_precision
 
-    @T.no_grad()
-    def get_heatmap_maxima_idxs(self, 
-                                complete_heatmaps):
-        pooled_heatmaps = NNF.max_pool2d(complete_heatmaps,
-                                       3,
-                                       stride=1,
-                                       padding=1)
-        return (complete_heatmaps == pooled_heatmaps)
 
     def landmarks_from_idxs(self,
                             regressor_pred: T.tensor,
@@ -71,9 +64,9 @@ class Evaluate:
         num_detections = min(max(self.config['data']['max_detections']), num_detections)
         
         landmarks_pred = {
-            "boxes": T.zeros(num_detections,4),
-            "labels": T.zeros(num_detections).to(T.int32),
-            "scores": T.zeros(num_detections)
+            "boxes": T.zeros(num_detections,4, device=regressor_pred.device),
+            "labels": T.zeros(num_detections, device=regressor_pred.device).to(T.int32),
+            "scores": T.zeros(num_detections, device=regressor_pred.device)
         }
 
         # Flattens it so we can use topk
@@ -87,7 +80,7 @@ class Evaluate:
         
         # This retrieves all of the (flattened) indices (of the output image) where the classification has a peak
         flattened_idxs = T.nonzero(T.flatten(idxs_tensor_mask)).reshape(-1)
-
+        
         # this retrieves only the top "num_detections" of them (but still, flattened)
         flattened_top_k_idxs = flattened_idxs[top_k_scores.indices]
 
@@ -96,7 +89,7 @@ class Evaluate:
         base_mask[flattened_top_k_idxs] += 1
         mask = base_mask.to(dtype=T.bool)
 
-        top_k_mask = T.unflatten(mask, dim=0, sizes=(n_classes, output_width, output_height))
+        top_k_mask = T.unflatten(mask, dim=0, sizes=(n_classes, output_height, output_width))
         top_k_idxs = T.nonzero(top_k_mask)
 
         regressor_pred_repeated = regressor_pred.repeat(n_classes,1,1,1)
@@ -117,17 +110,14 @@ class Evaluate:
         center_coord_x = center_idx_x+off_x
         center_coord_y = center_idx_y+off_y
 
-        for i, (c, cx, cy, sx, sy, score) in \
-            enumerate(zip(category, center_coord_x, center_coord_y, size_x, size_y, confidence_scores)):
-
-                landmarks_pred["boxes"][i,0] = cx 
-                landmarks_pred["boxes"][i,1] = cy 
-                landmarks_pred["boxes"][i,2] = sx 
-                landmarks_pred["boxes"][i,3] = sy 
-                landmarks_pred["labels"][i] = c
-                landmarks_pred["scores"][i] = score
-
+        landmarks_pred['boxes'][:, 0] = center_coord_x
+        landmarks_pred['boxes'][:, 1] = center_coord_y
+        landmarks_pred['boxes'][:, 2] = size_x
+        landmarks_pred['boxes'][:, 3] = size_y
+        landmarks_pred["labels"] = category
+        landmarks_pred["scores"] = confidence_scores[top_k_scores.indices]
         return landmarks_pred
+
 
     def resize_landmarks(self, landmarks):
         landmarks["boxes"][:,0] *= self.config['data']['output_stride'][0]
@@ -136,6 +126,17 @@ class Evaluate:
             landmarks["boxes"][:,2] *= self.config['data']['input_to_model_resolution'][0]
             landmarks["boxes"][:,3] *= self.config['data']['input_to_model_resolution'][1]
         return landmarks
+
+
+    @T.no_grad()
+    def get_heatmap_maxima_idxs(self, 
+                                complete_heatmaps):
+        pooled_heatmaps = NNF.max_pool2d(complete_heatmaps,
+                                       3,
+                                       stride=1,
+                                       padding=1)
+        return (complete_heatmaps == pooled_heatmaps)
+
 
     @T.no_grad()
     def __call__(self, is_novel=False, is_full:bool=False):
@@ -169,12 +170,11 @@ class Evaluate:
             else:
                 raise NotImplementedError
 
+            idxs_tensor_batch = self.get_heatmap_maxima_idxs(complete_heatmaps_batch)
+
             # iteration on batch_size
-            for i, (reg_pred, complete_heatmaps, n_landmarks) in \
-                enumerate(zip(reg_pred_batch, complete_heatmaps_batch, n_landmarks_batch)):
-
-
-                idxs_tensor = self.get_heatmap_maxima_idxs(complete_heatmaps)
+            for i, (reg_pred, complete_heatmaps, idxs_tensor, n_landmarks) in \
+                enumerate(zip(reg_pred_batch, complete_heatmaps_batch, idxs_tensor_batch, n_landmarks_batch)):
 
                 landmarks_pred = self.landmarks_from_idxs(
                     reg_pred,
@@ -183,8 +183,8 @@ class Evaluate:
                 )
 
                 landmarks_gt = {
-                    "boxes": padded_landmarks["boxes"][i,:n_landmarks,:],
-                    "labels": padded_landmarks["labels"][i,:n_landmarks]
+                    "boxes": padded_landmarks["boxes"][i,:n_landmarks,:].to(self.device),
+                    "labels": padded_landmarks["labels"][i,:n_landmarks].to(self.device)
                 }
 
                 landmarks_pred = self.resize_landmarks(landmarks_pred)
@@ -204,7 +204,7 @@ class Evaluate:
                     gt_positive_batch.append(landmarks_gt_positive)
 
                     ious = box_iou(box_convert(landmarks_gt["boxes"], in_fmt="cxcywh", out_fmt="xyxy"),
-                                box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
+                                   box_convert(landmarks_pred["boxes"], in_fmt="cxcywh", out_fmt="xyxy"))
                     
                     ious_mask = ious >= thrs
 
@@ -236,13 +236,14 @@ class Evaluate:
 
             if self.more_metrics:
                 self.metric_only_regression.set_dtype(T.float16)
-                self.metric_only_regression.detection_labels = [d.to(T.int16) for d in self.metric_only_regression.detection_labels]
-                self.metric_only_regression.groundtruth_labels = [d.to(T.int16) for d in self.metric_only_regression.groundtruth_labels]
+                self.metric_only_regression.detection_labels = [d.to(T.int16) 
+                        for d in self.metric_only_regression.detection_labels]
+                self.metric_only_regression.groundtruth_labels = [d.to(T.int16) 
+                        for d in self.metric_only_regression.groundtruth_labels]
 
         result = {
             self.prefix + k: v
             for k, v in self.metric.compute().items()
-            # for k, v in self.metric.compute().copy().items()
         }
         self.metric.reset()
 
@@ -250,7 +251,6 @@ class Evaluate:
             result_regression = {
                 self.prefix + "regression_" + k: v
                 for k, v in self.metric_only_regression.compute().items()
-                # for k, v in self.metric_only_regression.compute().copy().items()
             }
             self.metric_only_regression.reset()
 
