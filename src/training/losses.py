@@ -13,7 +13,7 @@ def heatmap_loss(pred_heatmap, gt_heatmap, num_keypoints, config, weights = None
                 (pred_heatmap) ** config['model']['alpha_loss'] * T.log(1 - pred_heatmap) * weights,
         ).reshape(pred_heatmap.shape[0], -1).sum(dim=-1)
 
-        loss /= T.sum(weights[:,0,0]) * weights.shape[0]
+        loss = loss / T.sum(weights[:,0,0]) * weights.shape[0]
 
     else:
         loss = T.where(
