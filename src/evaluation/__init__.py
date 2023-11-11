@@ -37,7 +37,7 @@ class Evaluate:
                  device,
                  config,
                  prefix="",
-                 more_metrics=False,
+                 more_metrics=True,
                  half_precision=False):
         
         self.model   = model

@@ -50,7 +50,7 @@ def setup_warm_start(model: Model, optimizer, freeze=True):
 
     # Reduce learning rate
     for g in optimizer.param_groups:
-        g['lr'] = g['lr'] * (0.1 if freeze else 10) 
+        g['lr'] = g['lr'] * (0.01 if freeze else 100) 
 
 
 def train_loop(model,
