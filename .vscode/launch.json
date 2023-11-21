@@ -30,6 +30,14 @@
             "program": "final_model_eval.py",
             "console": "integratedTerminal",
             "justMyCode": false
+        },{
+            "name": "Optimize Confidence Threshold",
+            "type": "python",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/src",
+            "program": "optimize_confidence_thr.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

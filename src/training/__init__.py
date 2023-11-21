@@ -170,7 +170,8 @@ def train_loop(model,
                 validation_loader, 
                 prefix="val/",
                 device=device,
-                config=config
+                config=config,
+                confidence_threshold=config['eval']['threshold_classification_scores']
             )(is_novel=novel_training)
             log_dict.update(metrics_validation)
 

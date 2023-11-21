@@ -47,7 +47,7 @@ training:
   
   loss_clip_norm: 1.0
 
-  batch_size: 4
+  batch_size: 2
   num_workers: 4
   pin_memory: True
   drop_last: False
@@ -60,6 +60,9 @@ training:
   base_weights_load_name: best_model_adjusted.pt
   base_stats_save_name: base_training_info.pkl
   novel_stats_save_name: novel_training_info.pkl
+
+testing:
+  visualization: False
 
 # Dataset parameters
 data:
@@ -107,6 +110,7 @@ data:
 
 eval:
   threshold_only_classification_metric: 0.5
+  threshold_classification_scores: 0.125
 
 paths:
   images_dir: ../data                                         # Base folder for image paths

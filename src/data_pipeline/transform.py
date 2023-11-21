@@ -103,10 +103,47 @@ class TransformTesting:
         image = self.normalize_mean_std(image)
 
         n_landmarks = len(landmarks)
-
         padded_landmarks = self.transform_landmarks(landmarks)
 
         return image, 0, n_landmarks, padded_landmarks
+
+
+class TransformVisualization:
+    def __init__(self,
+                 config: Dict,
+                 base_classes: List = [],
+                 novel_classes: List = []) -> None:
+        
+        self.resize = ResizeOwn(size=config['data']['input_to_model_resolution']) 
+
+        self.normalize = NormalizeOwn()
+        self.normalize_mean_std = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+        self.landmarks_to_labels = LandmarksToLabels(config, base_classes, novel_classes)
+        self.transform_landmarks = LandmarksTransform(config, base_classes, novel_classes)
+
+
+    def __call__(self, 
+                 original_sample):
+        '''
+        Returns:
+            image: tensor to be given as input to the model
+            landmarks: useful for visualization and evaluation (but they are resized)
+            original_sample: useful for visualization and evaluation (they contain the original landmarks)
+        '''
+        transformed_sample = self.resize(original_sample)
+
+        image, landmarks = transformed_sample["image"], transformed_sample["landmarks"]
+
+        image = self.normalize(image)
+        image = self.normalize_mean_std(image)
+
+        labels = self.landmarks_to_labels(landmarks)
+        n_landmarks = len(landmarks)
+        padded_landmarks = self.transform_landmarks(landmarks)
+
+        return image, labels, transformed_sample["image"], n_landmarks, padded_landmarks
+
 
 
 # def anti_transform_testing_after_model(current_image,

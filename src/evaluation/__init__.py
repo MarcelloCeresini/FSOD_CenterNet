@@ -36,6 +36,7 @@ class Evaluate:
                  dataset,
                  device,
                  config,
+                 confidence_threshold=0.6,
                  prefix="",
                  more_metrics=True,
                  half_precision=False):
@@ -45,6 +46,7 @@ class Evaluate:
         self.prefix  = prefix
         self.device  = device
         self.config  = config
+        self.confidence_threshold = confidence_threshold
         self.metric = MeanAveragePrecision(box_format="cxcywh", 
                                            class_metrics=False).to(self.device)
         self.more_metrics = more_metrics
@@ -60,17 +62,19 @@ class Evaluate:
                             idxs_tensor_mask: T.tensor):
         n_classes, output_width, output_height = idxs_tensor_mask.shape
 
+        # Flattens it so we can use topk
+        confidence_scores = T.masked_select(complete_heatmaps, idxs_tensor_mask)
+        confidence_scores[confidence_scores < self.confidence_threshold] = 0.
+
         num_detections = T.sum(idxs_tensor_mask).to('cpu')
         num_detections = min(max(self.config['data']['max_detections']), num_detections)
-        
+        num_detections = min(T.sum(confidence_scores > 0), num_detections)
+
         landmarks_pred = {
             "boxes": T.zeros(num_detections,4, device=regressor_pred.device),
             "labels": T.zeros(num_detections, device=regressor_pred.device).to(T.int32),
             "scores": T.zeros(num_detections, device=regressor_pred.device)
         }
-
-        # Flattens it so we can use topk
-        confidence_scores = T.masked_select(complete_heatmaps, idxs_tensor_mask)
 
         # The i-th element in top_k_scores has the i-th highest confidence score in the image, 
         # but its index refers to its position in "confidence_scores" (which is a flattened tensor
@@ -144,6 +148,7 @@ class Evaluate:
 
         if self.more_metrics:
             only_classification_metric = 0
+            mean_n_predictions = 0
             n=0
             thrs = self.config["eval"]["threshold_only_classification_metric"]
 
@@ -216,6 +221,7 @@ class Evaluate:
                     precision = T.sum(both_correct) / T.sum(ious_mask) if T.sum(ious_mask) != 0 else 0
 
                     only_classification_metric = only_classification_metric*n/(n+1) + precision/(n+1)
+                    mean_n_predictions =  mean_n_predictions * n / (n+1) + landmarks_pred['scores'].shape[0] / (n+1)
                     n+=1
 
             self.metric.update(
@@ -255,6 +261,7 @@ class Evaluate:
             self.metric_only_regression.reset()
 
             result.update(result_regression)
-            result.update({"classification_precision": only_classification_metric})
+            result.update({self.prefix + "classification_precision": only_classification_metric,
+                           self.prefix + 'mean_n_predictions': mean_n_predictions})
 
         return result

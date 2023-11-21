@@ -102,7 +102,8 @@ def main(args):
                 dataset_base_test, 
                 prefix="test/",
                 device=device,
-                config=config
+                config=config,
+                confidence_threshold=config['eval']['threshold_classification_scores']
             )(is_novel=False)
 
             # TODO: add timestamp so that it doesn't overwrite the same metrics over and over
@@ -188,14 +189,20 @@ def main(args):
                     novel_k=current_train_K)
 
                 # Evaluation on novel_dataset
-                metrics_novel = Evaluate(model, dataset_novel_test, device, config, prefix="test/")(is_novel=True)
+                metrics_novel = Evaluate(
+                    model, dataset_novel_test, device, config, prefix="test/",
+                    confidence_threshold=config['eval']['threshold_classification_scores']
+                    )(is_novel=True)
                 metrics_novel_list[current_train_K].append(metrics_novel)
                 wandb.log(metrics_novel)
 
                 # Evaluation on base + novel
                 full_test_dataloader = dataset_gen.generate_full_dataloader(dataset_novel_test, 
                                                                             config['training']['batch_size'])
-                metrics_full = Evaluate(model, full_test_dataloader, device, config, prefix='full/')(is_full=True)
+                metrics_full = Evaluate(
+                    model, full_test_dataloader, device, config, prefix='full/',
+                    confidence_threshold=config['eval']['threshold_classification_scores']
+                )(is_full=True)
                 metrics_full_list[current_train_K].append(metrics_full)
                 wandb.log(metrics_full)
 

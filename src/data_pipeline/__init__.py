@@ -9,13 +9,13 @@ from pycocotools.coco import COCO
 from torch.utils.data import DataLoader, ConcatDataset, Dataset
 from torchvision.io import ImageReadMode, read_image
 
-from .transform import TransformTesting, TransformTraining
+from .transform import TransformTesting, TransformTraining, TransformVisualization
 
 
 class DatasetFromCocoAnnotations(Dataset):
 
     def __init__(self, coco: COCO, images_dir: str, 
-                 transform: TransformTesting | TransformTraining) -> None:
+                 transform: TransformTesting | TransformTraining | TransformVisualization) -> None:
         super().__init__()
         self.coco = coco
         self.images_dir = images_dir
@@ -60,7 +60,7 @@ class DatasetFromCocoAnnotations(Dataset):
         sample = {'image': image, 
                   "landmarks": annotations_for_image}
 
-        if isinstance(self.transform, (TransformTraining, TransformTesting)):
+        if isinstance(self.transform, (TransformTraining, TransformTesting, TransformVisualization)):
             return self.transform(sample)       # sample, transformed_landmarks, original_sample
         else:
             return sample
@@ -190,24 +190,44 @@ class DatasetsGenerator():
     def get_base_sets(self):
         # Validation should have TransformTraining or TransformTesting?
         # ANSWER: Training because it needs labels to compute the loss
-        return (
-            DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
-                self.config,
-                base_classes=list(self.train_base.cats),
-                novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else []
-            )),
-            DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining(
-                self.config,
-                base_classes=list(self.val_base.cats),
-                novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else []
-            )),
-            DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting(
-                self.config,
-                base_classes=list(self.test_base.cats),
-                novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else []
-            ))
-        )
-    
+        if self.config['testing']['visualization'] == False:
+            return (
+                DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformTraining(
+                    self.config,
+                    base_classes=list(self.train_base.cats),
+                    novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else []
+                )),
+                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformTraining(
+                    self.config,
+                    base_classes=list(self.val_base.cats),
+                    novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else []
+                )),
+                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformTesting(
+                    self.config,
+                    base_classes=list(self.test_base.cats),
+                    novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else []
+                ))
+            )
+        else:
+            return (
+                DatasetFromCocoAnnotations(self.train_base, self.images_dir, TransformVisualization(
+                    self.config,
+                    base_classes=list(self.train_base.cats),
+                    novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else []
+                )),
+                DatasetFromCocoAnnotations(self.val_base, self.images_dir, TransformVisualization(
+                    self.config,
+                    base_classes=list(self.val_base.cats),
+                    novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else []
+                )),
+                DatasetFromCocoAnnotations(self.test_base, self.images_dir, TransformVisualization(
+                    self.config,
+                    base_classes=list(self.test_base.cats),
+                    novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else []
+                ))
+            )
+
+
     def generate_full_dataloader(self, test_novel_dataloader: DataLoader, 
                                  batch_size = None,
                                  num_workers = 1, pin_memory = True,
@@ -256,6 +276,22 @@ class DatasetsGenerator():
                 novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
             )),
                 DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformTesting(
+                self.config,
+                base_classes=list(self.test_base.cats),
+                novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
+            ))
+        ) if self.config['testing']['visualization'] == False else (
+            DatasetFromCocoAnnotations(self.train_novel, self.images_dir, TransformVisualization(
+                self.config,
+                base_classes=list(self.train_base.cats),
+                novel_classes=list(self.train_novel.cats) if hasattr(self, 'train_novel') else novel_classes_to_sample_list
+            )),
+                DatasetFromCocoAnnotations(self.val_novel, self.images_dir, TransformVisualization(
+                self.config,
+                base_classes=list(self.val_base.cats),
+                novel_classes=list(self.val_novel.cats) if hasattr(self, 'val_novel') else novel_classes_to_sample_list
+            )),
+                DatasetFromCocoAnnotations(self.test_novel, self.images_dir, TransformVisualization(
                 self.config,
                 base_classes=list(self.test_base.cats),
                 novel_classes=list(self.test_novel.cats) if hasattr(self, 'test_novel') else novel_classes_to_sample_list
