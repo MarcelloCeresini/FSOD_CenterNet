@@ -30,24 +30,17 @@ def train_one_epoch(model,
             loss_1 = T.mean(heatmap_loss(
                         pred_heat_novel, gt_heat_novel, n_detections, config
                     ), dim=0)
-            
-            loss_2 = T.mean(reg_loss(
-                        pred_reg, gt_reg, n_detections, config
-                    ), dim=0)
-            
-            loss = loss_1  # no loss_2 here
 
         else:
             loss_1 = T.mean(heatmap_loss(
                         pred_heat_base, gt_heat_base, n_detections, config, class_weights
                     ), dim=0)
-            
-            loss_2 = T.mean(reg_loss(
-                        pred_reg, gt_reg, n_detections, config
-                    ), dim=0)
-            
-            loss = loss_1 + loss_1
-        
+
+        loss_2 = T.mean(reg_loss(
+                    pred_reg, gt_reg, n_detections, config
+                ), dim=0)
+
+        loss = loss_1 + (loss_2 if not novel_training else 0.)
         
         loss.backward()
         T.nn.utils.clip_grad_norm_(model.parameters(), 

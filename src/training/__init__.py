@@ -45,17 +45,34 @@ def set_model_to_train_novel(model: Model, config: Dict):
     return model
 
 
-def setup_warm_start(model: Model, optimizer, freeze=True):
-    # Stop training for encoder
-    for module in model.named_children():
-        if 'encoder' in module[0]:
-            module[1].requires_grad_(not freeze)
-        else:
-            module[1].requires_grad_(True)
+def setup_warm_start(model: Model, optimizer, novel=False, freeze=True):
 
-    # Reduce learning rate
-    for g in optimizer.param_groups:
-        g['lr'] = g['lr'] * (0.01 if freeze else 100) 
+    if novel:
+
+        # Stop training for encoder
+        for m1 in model.named_children():
+            if 'head_novel_heatmap' in m1[0]:
+                for m2 in m1[1].named_parameters():
+                    if 'conv' in m2[0]:
+                        m2[1].requires_grad_(not freeze)
+                    else:
+                        m2[1].requires_grad_(True)
+
+        for g in optimizer.param_groups:
+            g['lr'] = g['lr'] * (0.01 if freeze else 100)
+
+    else:
+
+        # Stop training for encoder
+        for module in model.named_children():
+            if 'encoder' in module[0]:
+                module[1].requires_grad_(not freeze)
+            else:
+                module[1].requires_grad_(True)
+
+        # Reduce learning rate
+        for g in optimizer.param_groups:
+            g['lr'] = g['lr'] * (0.01 if freeze else 100) 
 
 
 def train_loop(model,
@@ -114,12 +131,10 @@ def train_loop(model,
         elif not novel_training and config['training']['base']['warm_start'] and epoch == 1:
             setup_warm_start(model, optimizer, freeze=False)
         elif novel_training and config['training']['novel']['warm_start'] and epoch == 0:
-            for g in optimizer.param_groups:
-                g['lr'] *= 0.001
+            setup_warm_start(model, optimizer, novel=True)
         elif novel_training and config['training']['novel']['warm_start'] and epoch == \
-            int(40/(novel_k if novel_k is not None else 1)):
-            for g in optimizer.param_groups:
-                g['lr'] *= 1000
+            int(60/(novel_k if novel_k is not None else 1)):
+            setup_warm_start(model, optimizer, novel=True, freeze=False)
 
         # Train for one epoch
         model.train()
