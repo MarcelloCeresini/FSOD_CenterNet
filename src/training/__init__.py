@@ -32,6 +32,11 @@ def set_model_to_train_novel(model: Model, config: Dict):
     with T.no_grad(): 
         model.head_novel_heatmap.conv1.weight.data = model.head_base_heatmap.conv1.weight.data
         model.head_novel_heatmap.conv1.bias.data = model.head_base_heatmap.conv1.bias.data
+        if not config['model']['less_convs']:
+            model.head_novel_heatmap.conv2.weight.data = model.head_base_heatmap.conv2.weight.data
+            model.head_novel_heatmap.conv2.bias.data = model.head_base_heatmap.conv2.bias.data
+            model.head_novel_heatmap.conv3.weight.data = model.head_base_heatmap.conv3.weight.data
+            model.head_novel_heatmap.conv3.bias.data = model.head_base_heatmap.conv3.bias.data
 
     # Finally, stop training for base model (only novel model shall be learned)
     for module in model.named_children():

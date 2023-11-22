@@ -151,8 +151,9 @@ def main(args):
                 # Reload weights from base training + freeze base part
                 model = set_model_to_train_novel(model, config)
                 model = model.to(device)
-                wandb.watch(model, log='all', 
-                            log_freq=config['debug']['wandb_watch_model_freq']*current_train_K)
+                # wandb.watch(model, log='all', 
+                #             log_freq=config['debug']['wandb_watch_model_freq'] / \
+                #                 current_train_K)
 
                 # Optimizer
                 optimizer_novel = Adam(model.parameters(), 
@@ -160,7 +161,8 @@ def main(args):
                                        weight_decay=config['training']['novel']['weight_decay'])
 
                 scheduler_novel = T.optim.lr_scheduler.ReduceLROnPlateau(
-                    optimizer_novel, patience=config['training']['novel']['reduce_lr_patience']
+                    optimizer_novel, patience=config['training']['novel']['reduce_lr_patience'] / \
+                        current_train_K
                 )
 
                 # Obtain dataset from generator

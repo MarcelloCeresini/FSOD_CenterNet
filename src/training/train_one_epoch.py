@@ -36,7 +36,7 @@ def train_one_epoch(model,
                     ), dim=0)
             
             loss = loss_1  # no loss_2 here
-            
+
         else:
             loss_1 = T.mean(heatmap_loss(
                         pred_heat_base, gt_heat_base, n_detections, config, class_weights
