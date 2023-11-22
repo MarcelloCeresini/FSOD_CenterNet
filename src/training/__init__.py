@@ -110,7 +110,7 @@ def train_loop(model,
             setup_warm_start(model, optimizer, freeze=False)
         elif novel_training and config['training']['novel']['warm_start'] and epoch == 0:
             for g in optimizer.param_groups:
-                g['lr'] *= 0.001 
+                g['lr'] *= 0.001
         elif novel_training and config['training']['novel']['warm_start'] and epoch == \
             int(40/(novel_k if novel_k is not None else 1)):
             for g in optimizer.param_groups:
