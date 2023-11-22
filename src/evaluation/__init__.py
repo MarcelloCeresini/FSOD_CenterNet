@@ -39,7 +39,8 @@ class Evaluate:
                  confidence_threshold=0.6,
                  prefix="",
                  more_metrics=True,
-                 half_precision=False):
+                 half_precision=False,
+                 class_metrics=False):
         
         self.model   = model
         self.dataset = dataset
@@ -48,7 +49,8 @@ class Evaluate:
         self.config  = config
         self.confidence_threshold = confidence_threshold
         self.metric = MeanAveragePrecision(box_format="cxcywh", 
-                                           class_metrics=False).to(self.device)
+                                           class_metrics=class_metrics).to(
+                                            self.device)
         self.more_metrics = more_metrics
         if self.more_metrics:
             self.metric_only_regression = MeanAveragePrecision(box_format="cxcywh").to(
@@ -152,8 +154,8 @@ class Evaluate:
             n=0
             thrs = self.config["eval"]["threshold_only_classification_metric"]
 
-        for counter, (image_batch, _, n_landmarks_batch, padded_landmarks) in tqdm(
-                enumerate(self.dataset), total=len(self.dataset), position=1 + int(is_novel), 
+        for image_batch, _, n_landmarks_batch, padded_landmarks in tqdm(
+                self.dataset, total=len(self.dataset), position=1 + int(is_novel), 
                 leave=False, desc="Evaluation " + self.prefix):
 
             # both image and landmarks will be resized to model_input_size
