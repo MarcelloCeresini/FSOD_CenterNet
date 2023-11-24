@@ -391,6 +391,11 @@ class DatasetsGenerator():
                     # Get annotations for that image
                     img_annots = coco_dset.getAnnIds(imgIds=[img_id])
                     img_annots = coco_dset.loadAnns(img_annots)
+
+                    # Check that image has less than max_detections objects
+                    if len(img_annots) >= max(self.config['data']['max_detections']):
+                        continue
+
                     # Separate annotations into "annotations of that class" and 
                     # "annotations of another class"
                     class_annots = []; non_class_annots = []

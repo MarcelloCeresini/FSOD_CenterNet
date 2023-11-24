@@ -150,6 +150,10 @@ class LandmarksTransform:
         }
 
         for i, l in enumerate(landmarks):
+
+            if i >= self.max_detections:
+                break
+
             padded_landmarks["boxes"][i,0] = l["center_point"][0] / self.output_stride[0]
             padded_landmarks["boxes"][i,1] = l["center_point"][1] / self.output_stride[1]
             padded_landmarks["boxes"][i,2] = l["size"][0] / (self.input_resolution[0] if \

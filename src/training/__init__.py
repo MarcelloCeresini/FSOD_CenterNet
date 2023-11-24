@@ -4,6 +4,7 @@ import torch as T
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import wandb
+from copy import deepcopy
 
 from model import Model
 from training.callbacks import EarlyStopper
@@ -59,7 +60,7 @@ def setup_warm_start(model: Model, optimizer, novel=False, freeze=True):
                         m2[1].requires_grad_(True)
 
         for g in optimizer.param_groups:
-            g['lr'] = g['lr'] * (0.01 if freeze else 100)
+            g['lr'] = g['lr'] * (100 if freeze else 0.01)
 
     else:
 
@@ -95,7 +96,8 @@ def train_loop(model,
     # print(f"Started {'base' if not novel_training else 'novel'} training")
     # print("####################")
 
-    best_vloss = 1e10
+    best_vloss = 1e40
+    best_model = None
     batch_count = 0
 
     early_stopper = EarlyStopper(
@@ -121,7 +123,7 @@ def train_loop(model,
     else:
         class_weights = None
 
-    for epoch in tqdm(range(epochs), 
+    for epoch in tqdm(range(int(epochs / (novel_k if novel_k is not None else 1))), 
                       desc=f"{'Base' if not novel_training else 'Novel'} Training Epochs: ",
                       position=0 + int(novel_training),
                       leave=not novel_training):
@@ -133,7 +135,7 @@ def train_loop(model,
         elif novel_training and config['training']['novel']['warm_start'] and epoch == 0:
             setup_warm_start(model, optimizer, novel=True)
         elif novel_training and config['training']['novel']['warm_start'] and epoch == \
-            int(60/(novel_k if novel_k is not None else 1)):
+            int(300/(novel_k if novel_k is not None else 1)):
             setup_warm_start(model, optimizer, novel=True, freeze=False)
 
         # Train for one epoch
@@ -178,7 +180,8 @@ def train_loop(model,
                                          config),
                                 dim=0)
 
-                running_vloss += (vloss_heat + vloss_reg)
+                vloss_tot = vloss_heat + (vloss_reg if not novel_training else 0)
+                running_vloss += vloss_tot
 
         avg_vloss = running_vloss.item() / (i + 1)
 
@@ -210,6 +213,7 @@ def train_loop(model,
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
+            best_model = deepcopy(model.state_dict())
 
             if not novel_training:
                 os.makedirs(weights_path, exist_ok=True)
@@ -220,5 +224,7 @@ def train_loop(model,
         # Early stopping
         if early_stopper.early_stop(avg_vloss):
             break
+
+        model.load_state_dict(best_model)
 
     return model

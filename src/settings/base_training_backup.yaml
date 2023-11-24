@@ -4,7 +4,7 @@ model:
   less_convs: False
   softmax_activation: False
   head_base_heatmap_mode: CosHead
-  head_novel_heatmap_mode: CosHead
+  head_novel_heatmap_mode: AdaptiveCosHead
 
   head_regressor_latent_dim: 64     # output dimension of the first 3x3 convolution in the regressor head
   head_heatmap_latent_dim: 64       # output dimension of the first 3x3 convolution in the heatmap head
@@ -15,14 +15,14 @@ model:
   lambda_offset_loss: 1.0
 
 training:
-  no_overwrite: True               #TODO: put it to True once base training is done
-  
-  normalize_size: False
-  use_class_weights: False
+  no_overwrite: False               #TODO: put it to True once base training is done
 
-  train_base: False
-  train_novel: True
-  repeat_novel_training: 6
+  normalize_size: False
+  use_class_weights: True
+
+  train_base: True
+  train_novel: False
+  repeat_novel_training: 2
 
   base:
     lr: 0.0001
@@ -34,20 +34,19 @@ training:
     train_step_log_interval: 250
     early_stopping_patience: 15
     early_stopping_min_delta: 0.2
+    warm_start: True
 
   novel:
-    lr: 0.00001
-    encoder_lr: 0.000001
-    reduce_lr_patience: 1000000000000
+    lr: 0.0001
+    reduce_lr_patience: 5
     weight_decay: 0.0001
-    epochs: 1000
-    warm_start: True
-    epoch_metric_log_interval: 40
-    train_step_log_interval: 1
-    early_stopping_patience: 2000000000000
+    epochs: 5
+    epoch_metric_log_interval: 1
+    train_step_log_interval: 100
+    early_stopping_patience: 8
     early_stopping_min_delta: 0.2
   
-  loss_clip_norm: 2.0
+  loss_clip_norm: 1.0
 
   batch_size: 4
   num_workers: 4
@@ -60,11 +59,8 @@ training:
 
   base_weights_save_name: best_model_adjusted.pt
   base_weights_load_name: best_model_adjusted.pt
-  base_stats_save_name: base_training_info.pkl
-  novel_stats_save_name: novel_training_info.pkl
-
-testing:
-  visualization: False
+  base_stats_save_name: base_training_adjusted_info.pkl
+  novel_stats_save_name: novel_training_adjusted_info.pkl
 
 # Dataset parameters
 data:
@@ -83,12 +79,12 @@ data:
     hue_jitter: 0.1
 
   min_IoU_for_gaussian_radius: 0.8
-  max_detections: [1, 5, 10]
+  max_detections: [1, 10, 50]
 
   gen_random_seed: null                 # Can be a null, a number or a list. It's used to force the dataset generator
                                         # to recreate specific novel sets. If it's a list, it's expected to be of len |K|. 
 
-  novel_classes_to_sample: 20           # If None, the novel_class_list will be used instead.
+  novel_classes_to_sample: 10           # If None, the novel_class_list will be used instead.
                                         # If both are none, all novel classes will be used. 
                                         # Otherwise, the number of novel classes to sample.
 
@@ -101,18 +97,17 @@ data:
                                         # we can instead pass two pre-made train and validation sets + a novel train
                                         # and a novel val sets that will directly be used.
 
-  K: [1, 5, 10, 20]                     # The number of few shots for the novel classes. Can also be a list: in that case
+  K: [5,10]                                 # The number of few shots for the novel classes. Can also be a list: in that case
                                         # experiments will be repeated |K| times.
   
-  val_K: [10, 15, 20, 25]               # The number of few shots for the novel classes in the val dataset. 
+  val_K: [15,20]                             # The number of few shots for the novel classes in the val dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
-  test_K: [64, 55, 45, 25]              # The number of few shots for the novel classes in the test dataset. 
+  test_K: [15,20]                            # The number of few shots for the novel classes in the test dataset. 
                                         # Can also be a list: in that case experiments will be repeated |K| times.
 
 eval:
   threshold_only_classification_metric: 0.5
-  threshold_classification_scores: 0
 
 paths:
   images_dir: ../data                                         # Base folder for image paths
@@ -129,6 +124,6 @@ paths:
 
 debug:
   debug_mode_active: True
-  wandb_watch_model_freq: 50
+  wandb_watch_model_freq: 100
 
 device: cuda       # "cpu" or "cuda"
